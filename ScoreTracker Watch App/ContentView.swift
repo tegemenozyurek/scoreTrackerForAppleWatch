@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import HealthKit
 
 struct ColorSelectionView: View {
     let title: String
@@ -280,6 +281,7 @@ struct FootballSetupView: View {
     @State private var selectedTime = 90
     @State private var currentStep = 0 // 0: Team 1, 1: Team 2, 2: Time
     @State private var dragOffset: CGFloat = 0
+    @State private var showingScoreboard = false
     let themeColor: Color
     let showTimePicker: Bool
     
@@ -371,7 +373,7 @@ struct FootballSetupView: View {
                             .buttonStyle(PlainButtonStyle())
                         } else {
                             Button {
-                                print("Start Game - Team 1: \(selectedTeam1Color), Team 2: \(selectedTeam2Color), Time: \(selectedTime) min")
+                                showingScoreboard = true
                             } label: {
                                 Text("Start Game")
                                     .font(.system(size: 14, weight: .semibold))
@@ -393,7 +395,161 @@ struct FootballSetupView: View {
             }
         }
         .navigationBarHidden(true)
+        .sheet(isPresented: $showingScoreboard) {
+            ScoreboardView(
+                team1Color: selectedTeam1Color,
+                team2Color: selectedTeam2Color,
+                totalMinutes: selectedTime
+            )
+        }
     }
+}
+
+struct ScoreboardView: View {
+    @Environment(\.dismiss) private var dismiss
+    let team1Color: Color
+    let team2Color: Color
+    let totalMinutes: Int
+    
+    @State private var team1Score = 0
+    @State private var team2Score = 0
+    
+    init(team1Color: Color, team2Color: Color, totalMinutes: Int) {
+        self.team1Color = team1Color
+        self.team2Color = team2Color
+        self.totalMinutes = totalMinutes
+    }
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                Color.black
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 0) {
+                    // Heart rate display (moved to top)
+                    VStack(spacing: 4) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "heart.fill")
+                                .foregroundColor(.red)
+                                .font(.system(size: 16))
+                            
+                            Text("--")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundColor(.white)
+                            
+                            Text("BPM")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.7))
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(Capsule())
+                    }
+                    .padding(.top, -60)
+                    
+                    // Score display
+                    HStack(spacing: 16) {
+                        // Team 1
+                        VStack(spacing: 8) {
+                            Circle()
+                                .fill(team1Color)
+                                .frame(width: 40, height: 40)
+                                .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                            
+                            Text("\(team1Score)")
+                                .font(.system(size: 48, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                        
+                        // VS separator
+                        Text("VS")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.6))
+                        
+                        // Team 2
+                        VStack(spacing: 8) {
+                            Circle()
+                                .fill(team2Color)
+                                .frame(width: 40, height: 40)
+                                .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                            
+                            Text("\(team2Score)")
+                                .font(.system(size: 48, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .padding(.top, 20)
+                    
+                    Spacer(minLength: 0)
+                    
+                    // Score buttons
+                    HStack(spacing: 12) {
+                        // Team 1 score buttons
+                        VStack(spacing: 6) {
+                            Button {
+                                team1Score += 1
+                            } label: {
+                                Text("+1")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 50, height: 32)
+                                    .background(team1Color)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            Button {
+                                if team1Score > 0 { team1Score -= 1 }
+                            } label: {
+                                Text("-1")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 50, height: 32)
+                                    .background(team1Color.opacity(0.7))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                        
+                        // Team 2 score buttons
+                        VStack(spacing: 6) {
+                            Button {
+                                team2Score += 1
+                            } label: {
+                                Text("+1")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 50, height: 32)
+                                    .background(team2Color)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            Button {
+                                if team2Score > 0 { team2Score -= 1 }
+                            } label: {
+                                Text("-1")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 50, height: 32)
+                                    .background(team2Color.opacity(0.7))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .padding(.bottom, 20)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            }
+        }
+
+        .navigationBarHidden(true)
+    }
+    
+
 }
 
 struct SportCard: View {
