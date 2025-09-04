@@ -462,6 +462,15 @@ struct ScoreboardView: View {
                                 .font(.system(size: 48, weight: .bold))
                                 .foregroundColor(.white)
                         }
+                        .contentShape(Rectangle())
+                        .onTapGesture { team1Score += 1 }
+                        .gesture(
+                            DragGesture().onEnded { value in
+                                if abs(value.translation.height) > 20 {
+                                    if team1Score > 0 { team1Score -= 1 }
+                                }
+                            }
+                        )
                         
                         // VS separator
                         Text("VS")
@@ -479,68 +488,22 @@ struct ScoreboardView: View {
                                 .font(.system(size: 48, weight: .bold))
                                 .foregroundColor(.white)
                         }
+                        .contentShape(Rectangle())
+                        .onTapGesture { team2Score += 1 }
+                        .gesture(
+                            DragGesture().onEnded { value in
+                                if abs(value.translation.height) > 20 {
+                                    if team2Score > 0 { team2Score -= 1 }
+                                }
+                            }
+                        )
                     }
                     .padding(.top, 20)
                     
                     Spacer(minLength: 0)
                     
                     // Score buttons
-                    HStack(spacing: 12) {
-                        // Team 1 score buttons
-                        VStack(spacing: 6) {
-                            Button {
-                                team1Score += 1
-                            } label: {
-                                Text("+1")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .frame(width: 50, height: 32)
-                                    .background(team1Color)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            Button {
-                                if team1Score > 0 { team1Score -= 1 }
-                            } label: {
-                                Text("-1")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .frame(width: 50, height: 32)
-                                    .background(team1Color.opacity(0.7))
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                        
-                        // Team 2 score buttons
-                        VStack(spacing: 6) {
-                            Button {
-                                team2Score += 1
-                            } label: {
-                                Text("+1")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .frame(width: 50, height: 32)
-                                    .background(team2Color)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            Button {
-                                if team2Score > 0 { team2Score -= 1 }
-                            } label: {
-                                Text("-1")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .frame(width: 50, height: 32)
-                                    .background(team2Color.opacity(0.7))
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                    }
-                    .padding(.bottom, 20)
+                    Spacer(minLength: 12)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
