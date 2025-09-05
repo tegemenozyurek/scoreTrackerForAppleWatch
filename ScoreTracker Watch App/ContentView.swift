@@ -282,6 +282,7 @@ struct FootballSetupView: View {
     @State private var currentStep = 0 // 0: Team 1, 1: Team 2, 2: Time
     @State private var dragOffset: CGFloat = 0
     @State private var showingScoreboard = false
+    @State private var dismissToMain = false
     let themeColor: Color
     let showTimePicker: Bool
     
@@ -399,8 +400,14 @@ struct FootballSetupView: View {
             ScoreboardView(
                 team1Color: selectedTeam1Color,
                 team2Color: selectedTeam2Color,
-                totalMinutes: selectedTime
+                totalMinutes: selectedTime,
+                dismissToMain: $dismissToMain
             )
+        }
+        .onChange(of: dismissToMain) { _, newValue in
+            if newValue {
+                dismiss()
+            }
         }
     }
 }
@@ -410,14 +417,20 @@ struct ScoreboardView: View {
     let team1Color: Color
     let team2Color: Color
     let totalMinutes: Int
+    @Binding var dismissToMain: Bool
     
     @State private var team1Score = 0
     @State private var team2Score = 0
+    @State private var remainingSeconds: Int = 0
+    @State private var isGameActive = true
+    @State private var showingFinishAlert = false
     
-    init(team1Color: Color, team2Color: Color, totalMinutes: Int) {
+    init(team1Color: Color, team2Color: Color, totalMinutes: Int, dismissToMain: Binding<Bool>) {
         self.team1Color = team1Color
         self.team2Color = team2Color
         self.totalMinutes = totalMinutes
+        self._dismissToMain = dismissToMain
+        self._remainingSeconds = State(initialValue: max(0, totalMinutes * 60))
     }
     
     var body: some View {
@@ -450,16 +463,16 @@ struct ScoreboardView: View {
                     .padding(.top, -60)
                     
                     // Score display
-                    HStack(spacing: 16) {
+                    HStack(spacing: 12) {
                         // Team 1
-                        VStack(spacing: 8) {
+                        VStack(spacing: 4) {
                             Circle()
                                 .fill(team1Color)
-                                .frame(width: 40, height: 40)
+                                .frame(width: 32, height: 32)
                                 .overlay(Circle().stroke(Color.white, lineWidth: 2))
                             
                             Text("\(team1Score)")
-                                .font(.system(size: 48, weight: .bold))
+                                .font(.system(size: 36, weight: .bold))
                                 .foregroundColor(.white)
                         }
                         .contentShape(Rectangle())
@@ -474,18 +487,18 @@ struct ScoreboardView: View {
                         
                         // VS separator
                         Text("VS")
-                            .font(.system(size: 20, weight: .semibold))
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white.opacity(0.6))
                         
                         // Team 2
-                        VStack(spacing: 8) {
+                        VStack(spacing: 4) {
                             Circle()
                                 .fill(team2Color)
-                                .frame(width: 40, height: 40)
+                                .frame(width: 32, height: 32)
                                 .overlay(Circle().stroke(Color.white, lineWidth: 2))
                             
                             Text("\(team2Score)")
-                                .font(.system(size: 48, weight: .bold))
+                                .font(.system(size: 36, weight: .bold))
                                 .foregroundColor(.white)
                         }
                         .contentShape(Rectangle())
@@ -498,21 +511,61 @@ struct ScoreboardView: View {
                             }
                         )
                     }
-                    .padding(.top, 20)
+                    .padding(.top, 10)
                     
                     Spacer(minLength: 0)
                     
-                    // Score buttons
-                    Spacer(minLength: 12)
+                    // Timer display (only if totalMinutes > 0)
+                    if totalMinutes > 0 {
+                        Text(timeString)
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.bottom, 8)
+                    }
+                    
+                    // Finish Match button
+                    Button {
+                        showingFinishAlert = true
+                    } label: {
+                        Text("Finish Match")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.red)
+                            .cornerRadius(8)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
-
+        .onReceive(timer) { _ in
+            if totalMinutes > 0 && isGameActive && remainingSeconds > 0 {
+                remainingSeconds -= 1
+            }
+        }
+        .alert("Finish Match?", isPresented: $showingFinishAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Yes, Finish", role: .destructive) {
+                dismissToMain = true
+                dismiss()
+            }
+        } message: {
+            Text("Are you sure you want to finish the match?")
+        }
         .navigationBarHidden(true)
     }
     
-
+    private var timeString: String {
+        let minutes = remainingSeconds / 60
+        let seconds = remainingSeconds % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+    
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 }
 
 struct SportCard: View {
