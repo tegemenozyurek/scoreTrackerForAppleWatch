@@ -102,11 +102,12 @@ struct SetupButtonStackPlacement<Buttons: View>: View {
 }
 
 struct PickColorWheelHint: View {
+    var label: String = "Color"
     @State private var isArrowPulsing = false
     
     var body: some View {
         ZStack {
-            Text("Color")
+            Text(label)
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundColor(.white.opacity(0.9))
                 .fixedSize()
@@ -362,7 +363,7 @@ private struct DurationWheelColumn: View {
             through: Double(max(0, options.count - 1)),
             by: 1,
             sensitivity: .medium,
-            isContinuous: false,
+            isContinuous: true,
             isHapticFeedbackEnabled: true
         )
         .onAppear {
@@ -539,6 +540,7 @@ struct TimeDurationPicker: View {
             .onChange(of: minutes) { _, _ in
                 if !isUnlimited { totalMinutes = hours * 60 + minutes }
             }
+            .scrollIndicators(.hidden)
         }
     }
     
@@ -663,6 +665,19 @@ struct FootballSetupView: View {
                                         primaryForegroundColor: .white,
                                         isPrimaryPulsing: isStartPulsing
                                     )
+                                }
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .scrollIndicators(.hidden)
+                            .overlay {
+                                GeometryReader { proxy in
+                                    PickColorWheelHint(label: "Time")
+                                        .frame(width: 26, height: 62)
+                                        .allowsHitTesting(false)
+                                        .position(
+                                            x: proxy.size.width - 16,
+                                            y: proxy.size.height * 0.26
+                                        )
                                 }
                             }
                         }
