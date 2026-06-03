@@ -406,11 +406,9 @@ private struct DurationWheelColumn: View {
 
 struct TimeDurationPicker: View {
     @Binding var totalMinutes: Int
+    @Binding var hasTimeLimit: Bool
     let accentColor: Color
     
-    @State private var hours: Int = 1
-    @State private var minutes: Int = 0
-    @State private var isUnlimited: Bool = false
     @State private var highlightedPicker: FocusedDurationPicker = .hours
     @FocusState private var focusedPicker: FocusedDurationPicker?
     
@@ -421,6 +419,31 @@ struct TimeDurationPicker: View {
     
     private let hourRange: [Int] = Array(0...3)
     private let minuteStepRange: [Int] = Array(stride(from: 0, through: 55, by: 5)) // 0,5,10,...55
+    
+    private var hoursBinding: Binding<Int> {
+        Binding(
+            get: { min(hourRange.last ?? 0, max(0, totalMinutes / 60)) },
+            set: { newHours in
+                guard hasTimeLimit else { return }
+                totalMinutes = newHours * 60 + snappedMinutes
+            }
+        )
+    }
+    
+    private var minutesBinding: Binding<Int> {
+        Binding(
+            get: { snappedMinutes },
+            set: { newMinutes in
+                guard hasTimeLimit else { return }
+                totalMinutes = min(hourRange.last ?? 0, max(0, totalMinutes / 60)) * 60 + newMinutes
+            }
+        )
+    }
+    
+    private var snappedMinutes: Int {
+        let remainder = totalMinutes % 60
+        return minuteStepRange.min(by: { abs($0 - remainder) < abs($1 - remainder) }) ?? 0
+    }
     
     var body: some View {
         GeometryReader { proxy in
@@ -434,7 +457,7 @@ struct TimeDurationPicker: View {
                 HStack(alignment: .top, spacing: 6) {
                     VStack(spacing: 3) {
                         DurationWheelColumn(
-                            value: $hours,
+                            value: hoursBinding,
                             options: hourRange,
                             format: { "\($0)" },
                             pickerFontSize: pickerFontSize,
@@ -454,7 +477,7 @@ struct TimeDurationPicker: View {
                     
                     VStack(spacing: 3) {
                         DurationWheelColumn(
-                            value: $minutes,
+                            value: minutesBinding,
                             options: minuteStepRange,
                             format: { String(format: "%02d", $0) },
                             pickerFontSize: pickerFontSize,
@@ -472,26 +495,26 @@ struct TimeDurationPicker: View {
                             .frame(width: pickerWidth)
                     }
                 }
-                .disabled(isUnlimited)
+                .disabled(!hasTimeLimit)
                 
                 Button {
-                    isUnlimited.toggle()
-                    if isUnlimited {
-                        totalMinutes = 0
+                    hasTimeLimit.toggle()
+                    if hasTimeLimit {
+                        if totalMinutes <= 0 { totalMinutes = 60 }
                     } else {
-                        totalMinutes = hours * 60 + minutes
+                        totalMinutes = 0
                     }
                 } label: {
                     HStack(spacing: 5) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 3)
-                                .fill(isUnlimited ? Color.white : Color.clear)
+                                .fill(hasTimeLimit ? Color.clear : Color.white)
                                 .frame(width: 13, height: 13)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 3)
                                         .stroke(Color.white.opacity(0.75), lineWidth: 1)
                                 )
-                            if isUnlimited {
+                            if !hasTimeLimit {
                                 Image(systemName: "checkmark")
                                     .font(.system(size: 8, weight: .bold))
                                     .foregroundColor(.black)
@@ -508,37 +531,28 @@ struct TimeDurationPicker: View {
             }
             .padding(.top, 32)
             .onAppear {
-                if totalMinutes == 0 {
-                    isUnlimited = true
-                } else {
-                    isUnlimited = false
-                    hours = min(3, totalMinutes / 60)
-                    minutes = totalMinutes % 60
-                    let remainder = minutes % 5
-                    if remainder != 0 { minutes -= remainder }
-                }
-                if !isUnlimited {
+                if hasTimeLimit {
+                    if totalMinutes <= 0 { totalMinutes = 60 }
+                    else { totalMinutes = min(hourRange.last ?? 0, totalMinutes / 60) * 60 + snappedMinutes }
                     highlightedPicker = .hours
                     focusedPicker = .hours
+                } else {
+                    totalMinutes = 0
                 }
             }
             .onChange(of: focusedPicker) { _, newFocus in
-                guard let newFocus, !isUnlimited else { return }
+                guard let newFocus, hasTimeLimit else { return }
                 highlightedPicker = newFocus
             }
-            .onChange(of: isUnlimited) { _, unlimited in
-                if unlimited {
-                    focusedPicker = nil
-                } else {
+            .onChange(of: hasTimeLimit) { _, limited in
+                if limited {
+                    if totalMinutes <= 0 { totalMinutes = 60 }
                     highlightedPicker = .hours
                     focusedPicker = .hours
+                } else {
+                    totalMinutes = 0
+                    focusedPicker = nil
                 }
-            }
-            .onChange(of: hours) { _, _ in
-                if !isUnlimited { totalMinutes = hours * 60 + minutes }
-            }
-            .onChange(of: minutes) { _, _ in
-                if !isUnlimited { totalMinutes = hours * 60 + minutes }
             }
             .scrollIndicators(.hidden)
         }
@@ -554,14 +568,23 @@ struct TimeDurationPicker: View {
     }
 }
 
+private struct MatchSession: Identifiable {
+    let id = UUID()
+    let team1Color: Color
+    let team2Color: Color
+    let initialTimerSeconds: Int
+    let countsUp: Bool
+}
+
 struct FootballSetupView: View {
     @Environment(\.dismiss) private var dismiss
     var onDismissToSportList: (() -> Void)? = nil
     @State private var team1ColorIndex = TeamColor.red.rawValue
     @State private var team2ColorIndex = TeamColor.blue.rawValue
     @State private var selectedTime = 60
+    @State private var hasTimeLimit = true
     @State private var currentStep = 0 // 0: Team 1, 1: Team 2, 2: Time
-    @State private var showingScoreboard = false
+    @State private var activeMatch: MatchSession?
     @State private var dismissToMain = false
     @State private var isStartPulsing = false
     let themeColor: Color
@@ -601,6 +624,16 @@ struct FootballSetupView: View {
         } else {
             dismiss()
         }
+    }
+    
+    private func startMatch() {
+        let timerSeconds = hasTimeLimit ? max(selectedTime, 1) * 60 : 0
+        activeMatch = MatchSession(
+            team1Color: selectedTeam1Color,
+            team2Color: selectedTeam2Color,
+            initialTimerSeconds: timerSeconds,
+            countsUp: !hasTimeLimit
+        )
     }
     
     private func cancelFromCurrentStep() {
@@ -649,6 +682,7 @@ struct FootballSetupView: View {
                             ZStack(alignment: .top) {
                                 TimeDurationPicker(
                                     totalMinutes: $selectedTime,
+                                    hasTimeLimit: $hasTimeLimit,
                                     accentColor: themeColor
                                 )
                                 .padding(.top, 24)
@@ -658,7 +692,7 @@ struct FootballSetupView: View {
                                 ) {
                                     SetupActionButtons(
                                         primaryTitle: "Start",
-                                        primaryAction: { showingScoreboard = true },
+                                        primaryAction: startMatch,
                                         secondaryTitle: "Cancel",
                                         secondaryAction: { currentStep = 1 },
                                         primaryBackgroundColor: themeColor,
@@ -713,18 +747,79 @@ struct FootballSetupView: View {
             }
         }
         .navigationBarHidden(true)
-        .sheet(isPresented: $showingScoreboard) {
+        .sheet(item: $activeMatch) { session in
             ScoreboardView(
-                team1Color: selectedTeam1Color,
-                team2Color: selectedTeam2Color,
-                totalMinutes: selectedTime,
+                team1Color: session.team1Color,
+                team2Color: session.team2Color,
+                initialTimerSeconds: session.initialTimerSeconds,
+                countsUp: session.countsUp,
                 dismissToMain: $dismissToMain
             )
         }
         .onChange(of: dismissToMain) { _, newValue in
             if newValue {
+                activeMatch = nil
                 exitToSportList()
             }
+        }
+    }
+}
+
+private struct MatchControlButton<Icon: View>: View {
+    let backgroundColor: Color
+    let accessibilityLabel: String
+    let isEnabled: Bool
+    let action: () -> Void
+    @ViewBuilder let icon: () -> Icon
+    
+    private let size: CGFloat = 44
+    
+    var body: some View {
+        Button(action: action) {
+            icon()
+                .frame(width: size, height: size)
+                .background(backgroundColor)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.45)
+        .accessibilityLabel(accessibilityLabel)
+    }
+}
+
+private struct ScoreSnapshot: Equatable {
+    let team1: Int
+    let team2: Int
+}
+
+private struct TeamScoreBall: View {
+    let color: Color
+    let onIncrement: () -> Void
+    let onDecrement: () -> Void
+    
+    var body: some View {
+        Image(systemName: "soccerball")
+            .font(.system(size: 48, weight: .medium))
+            .foregroundStyle(color)
+            .symbolRenderingMode(.monochrome)
+            .frame(width: 52, height: 52)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onIncrement)
+            .gesture(
+                DragGesture().onEnded { value in
+                    if abs(value.translation.height) > 20 {
+                        onDecrement()
+                    }
+                }
+            )
+    }
+}
+
+private func scoreDecrementDrag(onDecrement: @escaping () -> Void) -> some Gesture {
+    DragGesture().onEnded { value in
+        if abs(value.translation.height) > 20 {
+            onDecrement()
         }
     }
 }
@@ -733,21 +828,30 @@ struct ScoreboardView: View {
     @Environment(\.dismiss) private var dismiss
     let team1Color: Color
     let team2Color: Color
-    let totalMinutes: Int
+    let initialTimerSeconds: Int
+    let countsUp: Bool
     @Binding var dismissToMain: Bool
     
     @State private var team1Score = 0
     @State private var team2Score = 0
-    @State private var remainingSeconds: Int = 0
+    @State private var timerSeconds: Int = 0
     @State private var isGameActive = true
     @State private var showingFinishAlert = false
+    @State private var scoreHistory: [ScoreSnapshot] = []
     
-    init(team1Color: Color, team2Color: Color, totalMinutes: Int, dismissToMain: Binding<Bool>) {
+    init(
+        team1Color: Color,
+        team2Color: Color,
+        initialTimerSeconds: Int,
+        countsUp: Bool,
+        dismissToMain: Binding<Bool>
+    ) {
         self.team1Color = team1Color
         self.team2Color = team2Color
-        self.totalMinutes = totalMinutes
+        self.initialTimerSeconds = initialTimerSeconds
+        self.countsUp = countsUp
         self._dismissToMain = dismissToMain
-        self._remainingSeconds = State(initialValue: max(0, totalMinutes * 60))
+        self._timerSeconds = State(initialValue: countsUp ? 0 : initialTimerSeconds)
     }
     
     var body: some View {
@@ -779,89 +883,103 @@ struct ScoreboardView: View {
                     }
                     .padding(.top, -60)
                     
-                    // Score display
-                    HStack(spacing: 12) {
-                        // Team 1
-                        VStack(spacing: 4) {
-                            Circle()
-                                .fill(team1Color)
-                                .frame(width: 32, height: 32)
-                                .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                            
-                            Text("\(team1Score)")
-                                .font(.system(size: 36, weight: .bold))
-                                .foregroundColor(.white)
+                    // Score display: team ball | score - score | team ball
+                    HStack(spacing: 10) {
+                        TeamScoreBall(color: team1Color) {
+                            adjustTeam1Score(by: 1)
+                        } onDecrement: {
+                            adjustTeam1Score(by: -1)
                         }
-                        .contentShape(Rectangle())
-                        .onTapGesture { team1Score += 1 }
-                        .gesture(
-                            DragGesture().onEnded { value in
-                                if abs(value.translation.height) > 20 {
-                                    if team1Score > 0 { team1Score -= 1 }
-                                }
-                            }
-                        )
                         
-                        // VS separator
-                        Text("VS")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.6))
-                        
-                        // Team 2
-                        VStack(spacing: 4) {
-                            Circle()
-                                .fill(team2Color)
-                                .frame(width: 32, height: 32)
-                                .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                        HStack(spacing: 6) {
+                            Text("\(team1Score)")
+                                .font(.system(size: 40, weight: .bold))
+                                .foregroundColor(.white)
+                                .monospacedDigit()
+                                .contentShape(Rectangle())
+                                .onTapGesture { adjustTeam1Score(by: 1) }
+                                .gesture(scoreDecrementDrag { adjustTeam1Score(by: -1) })
+                            
+                            Text("-")
+                                .font(.system(size: 30, weight: .medium))
+                                .foregroundColor(.white.opacity(0.5))
                             
                             Text("\(team2Score)")
-                                .font(.system(size: 36, weight: .bold))
+                                .font(.system(size: 40, weight: .bold))
                                 .foregroundColor(.white)
+                                .monospacedDigit()
+                                .contentShape(Rectangle())
+                                .onTapGesture { adjustTeam2Score(by: 1) }
+                                .gesture(scoreDecrementDrag { adjustTeam2Score(by: -1) })
                         }
-                        .contentShape(Rectangle())
-                        .onTapGesture { team2Score += 1 }
-                        .gesture(
-                            DragGesture().onEnded { value in
-                                if abs(value.translation.height) > 20 {
-                                    if team2Score > 0 { team2Score -= 1 }
-                                }
-                            }
-                        )
+                        
+                        TeamScoreBall(color: team2Color) {
+                            adjustTeam2Score(by: 1)
+                        } onDecrement: {
+                            adjustTeam2Score(by: -1)
+                        }
                     }
                     .padding(.top, 10)
+                    .offset(y: 2)
+                    .overlay(alignment: .bottom) {
+                        Text(timeString)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.85))
+                            .offset(y: 26)
+                    }
                     
                     Spacer(minLength: 0)
                     
-                    // Timer display (only if totalMinutes > 0)
-                    if totalMinutes > 0 {
-                        Text(timeString)
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(.bottom, 8)
+                    HStack(spacing: 10) {
+                        MatchControlButton(
+                            backgroundColor: .yellow,
+                            accessibilityLabel: "Revert last score",
+                            isEnabled: !scoreHistory.isEmpty,
+                            action: revertLastScoreChange
+                        ) {
+                            Image(systemName: "arrow.uturn.backward")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                        
+                        MatchControlButton(
+                            backgroundColor: .orange,
+                            accessibilityLabel: isGameActive ? "Pause match" : "Resume match",
+                            isEnabled: true,
+                            action: { isGameActive.toggle() }
+                        ) {
+                            Image(systemName: isGameActive ? "pause.fill" : "play.fill")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                        
+                        MatchControlButton(
+                            backgroundColor: .red,
+                            accessibilityLabel: "Finish match",
+                            isEnabled: true,
+                            action: { showingFinishAlert = true }
+                        ) {
+                            Image("Whistle")
+                                .renderingMode(.template)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 22, height: 22)
+                                .foregroundStyle(.white)
+                        }
                     }
-                    
-                    // Finish Match button
-                    Button {
-                        showingFinishAlert = true
-                    } label: {
-                        Text("Finish Match")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(Color.red)
-                            .cornerRadius(8)
-                    }
-                    .buttonStyle(PlainButtonStyle())
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
+                    .padding(.bottom, 4)
+                    .offset(y: 8)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
         .onReceive(timer) { _ in
-            if totalMinutes > 0 && isGameActive && remainingSeconds > 0 {
-                remainingSeconds -= 1
+            guard isGameActive else { return }
+            if countsUp {
+                timerSeconds += 1
+            } else if timerSeconds > 0 {
+                timerSeconds -= 1
             }
         }
         .alert("Finish Match?", isPresented: $showingFinishAlert) {
@@ -876,9 +994,35 @@ struct ScoreboardView: View {
         .navigationBarHidden(true)
     }
     
+    private func pushScoreHistory() {
+        scoreHistory.append(ScoreSnapshot(team1: team1Score, team2: team2Score))
+    }
+    
+    private func adjustTeam1Score(by delta: Int) {
+        guard delta != 0 else { return }
+        let newScore = team1Score + delta
+        guard newScore >= 0 else { return }
+        pushScoreHistory()
+        team1Score = newScore
+    }
+    
+    private func adjustTeam2Score(by delta: Int) {
+        guard delta != 0 else { return }
+        let newScore = team2Score + delta
+        guard newScore >= 0 else { return }
+        pushScoreHistory()
+        team2Score = newScore
+    }
+    
+    private func revertLastScoreChange() {
+        guard let previous = scoreHistory.popLast() else { return }
+        team1Score = previous.team1
+        team2Score = previous.team2
+    }
+    
     private var timeString: String {
-        let minutes = remainingSeconds / 60
-        let seconds = remainingSeconds % 60
+        let minutes = timerSeconds / 60
+        let seconds = timerSeconds % 60
         return String(format: "%02d:%02d", minutes, seconds)
     }
     
