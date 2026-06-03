@@ -793,20 +793,128 @@ private struct ScoreSnapshot: Equatable {
     let team2: Int
 }
 
+private struct MatchScoreLabel: View {
+    let score: Int
+    let columnWidth: CGFloat
+    let fontSize: CGFloat
+    let onGoal: () -> Void
+    let onDecrement: () -> Void
+    
+    var body: some View {
+        Text("\(score)")
+            .font(.system(size: fontSize, weight: .bold))
+            .monospacedDigit()
+            .foregroundColor(.white)
+            .lineLimit(1)
+            .minimumScaleFactor(0.65)
+            .allowsTightening(true)
+            .frame(width: columnWidth, alignment: .center)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onGoal)
+            .gesture(scoreDecrementDrag(perform: onDecrement))
+    }
+}
+
+private struct ScoreboardScoreRow: View {
+    let team1Color: Color
+    let team2Color: Color
+    let team1Score: Int
+    let team2Score: Int
+    let team1Spin: Double
+    let team2Spin: Double
+    let onGoalTeam1: () -> Void
+    let onGoalTeam2: () -> Void
+    let onDecrementTeam1: () -> Void
+    let onDecrementTeam2: () -> Void
+    
+    var body: some View {
+        GeometryReader { geo in
+            let horizontalSpacing: CGFloat = 4
+            let dashWidth: CGFloat = 12
+            let ballSide = min(46, max(34, geo.size.width * 0.21))
+            let scoreAreaWidth = max(
+                0,
+                geo.size.width - (ballSide * 2) - dashWidth - (horizontalSpacing * 4)
+            )
+            let scoreColumnWidth = max(22, scoreAreaWidth / 2)
+            let maxScore = max(team1Score, team2Score)
+            let scoreFontSize = scoreFontSize(for: maxScore, columnWidth: scoreColumnWidth)
+            let dashFontSize = max(18, scoreFontSize * 0.75)
+            
+            HStack(spacing: horizontalSpacing) {
+                TeamScoreBall(
+                    color: team1Color,
+                    spinDegrees: team1Spin,
+                    side: ballSide,
+                    onIncrement: onGoalTeam1,
+                    onDecrement: onDecrementTeam1
+                )
+                
+                HStack(spacing: 2) {
+                    MatchScoreLabel(
+                        score: team1Score,
+                        columnWidth: scoreColumnWidth,
+                        fontSize: scoreFontSize,
+                        onGoal: onGoalTeam1,
+                        onDecrement: onDecrementTeam1
+                    )
+                    
+                    Text("-")
+                        .font(.system(size: dashFontSize, weight: .medium))
+                        .foregroundColor(.white.opacity(0.5))
+                        .frame(width: dashWidth)
+                        .lineLimit(1)
+                    
+                    MatchScoreLabel(
+                        score: team2Score,
+                        columnWidth: scoreColumnWidth,
+                        fontSize: scoreFontSize,
+                        onGoal: onGoalTeam2,
+                        onDecrement: onDecrementTeam2
+                    )
+                }
+                .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(1)
+                
+                TeamScoreBall(
+                    color: team2Color,
+                    spinDegrees: team2Spin,
+                    side: ballSide,
+                    onIncrement: onGoalTeam2,
+                    onDecrement: onDecrementTeam2
+                )
+            }
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .center)
+        }
+        .frame(height: 50)
+    }
+    
+    private func scoreFontSize(for score: Int, columnWidth: CGFloat) -> CGFloat {
+        let digits = max(1, String(score).count)
+        let base: CGFloat = switch digits {
+        case 1: min(36, columnWidth * 1.35)
+        case 2: min(30, columnWidth * 1.1)
+        default: min(24, columnWidth * 0.95)
+        }
+        return max(18, base)
+    }
+}
+
 private struct TeamScoreBall: View {
     let color: Color
     let spinDegrees: Double
+    var side: CGFloat = 48
     let onIncrement: () -> Void
     let onDecrement: () -> Void
     
     var body: some View {
         Image(systemName: "soccerball")
-            .font(.system(size: 48, weight: .medium))
+            .font(.system(size: side * 0.92, weight: .medium))
             .foregroundStyle(color)
             .symbolRenderingMode(.monochrome)
             .rotationEffect(.degrees(spinDegrees))
             .animation(.easeInOut(duration: TeamScoreBall.spinDuration), value: spinDegrees)
-            .frame(width: 52, height: 52)
+            .frame(width: side, height: side)
             .contentShape(Rectangle())
             .onTapGesture(perform: onIncrement)
             .gesture(
@@ -821,7 +929,7 @@ private struct TeamScoreBall: View {
     static let spinDuration: TimeInterval = 0.7
 }
 
-private func scoreDecrementDrag(onDecrement: @escaping () -> Void) -> some Gesture {
+private func scoreDecrementDrag(perform onDecrement: @escaping () -> Void) -> some Gesture {
     DragGesture().onEnded { value in
         if abs(value.translation.height) > 20 {
             onDecrement()
@@ -891,44 +999,19 @@ struct ScoreboardView: View {
                     }
                     .padding(.top, -60)
                     
-                    // Score display: team ball | score - score | team ball
-                    HStack(spacing: 10) {
-                        TeamScoreBall(
-                            color: team1Color,
-                            spinDegrees: team1Spin,
-                            onIncrement: { scoreGoal(for: 1) },
-                            onDecrement: { adjustTeam1Score(by: -1) }
-                        )
-                        
-                        HStack(spacing: 6) {
-                            Text("\(team1Score)")
-                                .font(.system(size: 40, weight: .bold))
-                                .foregroundColor(.white)
-                                .monospacedDigit()
-                                .contentShape(Rectangle())
-                                .onTapGesture { scoreGoal(for: 1) }
-                                .gesture(scoreDecrementDrag { adjustTeam1Score(by: -1) })
-                            
-                            Text("-")
-                                .font(.system(size: 30, weight: .medium))
-                                .foregroundColor(.white.opacity(0.5))
-                            
-                            Text("\(team2Score)")
-                                .font(.system(size: 40, weight: .bold))
-                                .foregroundColor(.white)
-                                .monospacedDigit()
-                                .contentShape(Rectangle())
-                                .onTapGesture { scoreGoal(for: 2) }
-                                .gesture(scoreDecrementDrag { adjustTeam2Score(by: -1) })
-                        }
-                        
-                        TeamScoreBall(
-                            color: team2Color,
-                            spinDegrees: team2Spin,
-                            onIncrement: { scoreGoal(for: 2) },
-                            onDecrement: { adjustTeam2Score(by: -1) }
-                        )
-                    }
+                    ScoreboardScoreRow(
+                        team1Color: team1Color,
+                        team2Color: team2Color,
+                        team1Score: team1Score,
+                        team2Score: team2Score,
+                        team1Spin: team1Spin,
+                        team2Spin: team2Spin,
+                        onGoalTeam1: { scoreGoal(for: 1) },
+                        onGoalTeam2: { scoreGoal(for: 2) },
+                        onDecrementTeam1: { adjustTeam1Score(by: -1) },
+                        onDecrementTeam2: { adjustTeam2Score(by: -1) }
+                    )
+                    .padding(.horizontal, 2)
                     .padding(.top, 10)
                     .offset(y: 2)
                     .overlay(alignment: .bottom) {
