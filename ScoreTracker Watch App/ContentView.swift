@@ -327,7 +327,7 @@ private struct DurationWheelColumn: View {
         let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
         let borderColor = isActive ? accentColor : Color.white.opacity(0.28)
         let borderWidth: CGFloat = isActive ? 2.5 : 1
-        let secondaryFontSize = max(11, pickerFontSize - 2)
+        let secondaryFontSize = max(12, pickerFontSize - 3)
         
         ZStack {
             shape.fill(Color.black)
@@ -407,7 +407,7 @@ struct TimeDurationPicker: View {
         GeometryReader { proxy in
             let width = proxy.size.width
             let isLarge = width > 175
-            let pickerFontSize: CGFloat = isLarge ? 14 : 13
+            let pickerFontSize: CGFloat = isLarge ? 18 : 16
             let pickerHeight: CGFloat = isLarge ? 68 : 60
             let pickerWidth: CGFloat = min(72, width * 0.34)
             
