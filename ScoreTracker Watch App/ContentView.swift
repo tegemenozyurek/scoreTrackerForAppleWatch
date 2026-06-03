@@ -142,7 +142,7 @@ struct TeamColorWheelSelectionView: View {
                     .allowsHitTesting(!isAdvancing)
                     .position(
                         x: proxy.size.width - 7,
-                        y: proxy.size.height * 0.33
+                        y: proxy.size.height * 0.26
                     )
             }
         }
