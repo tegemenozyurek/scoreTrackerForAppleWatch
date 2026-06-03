@@ -26,6 +26,79 @@ enum TeamColor: Int, CaseIterable {
     }
 }
 
+private enum SetupScreenMetrics {
+    static let buttonStackWidth: CGFloat = 120
+    static let buttonTopPadding: CGFloat = 26
+    static let contentVerticalOffset: CGFloat = 10
+    /// Matches Team # title + icon block height on the color steps.
+    static let headerBlockHeight: CGFloat = 80
+}
+
+struct SetupActionButtons: View {
+    let primaryTitle: String
+    let primaryAction: () -> Void
+    let secondaryTitle: String
+    let secondaryAction: () -> Void
+    var isPrimaryPulsing: Bool = false
+    var isInteractionEnabled: Bool = true
+    
+    var body: some View {
+        VStack(spacing: 6) {
+            Button(action: primaryAction) {
+                Text(primaryTitle)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.black)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 5)
+                    .background(Color.white)
+                    .cornerRadius(6)
+                    .scaleEffect(isPrimaryPulsing ? 1.03 : 0.98)
+                    .animation(
+                        .easeInOut(duration: 1.4).repeatForever(autoreverses: true),
+                        value: isPrimaryPulsing
+                    )
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            Button(action: secondaryAction) {
+                Text(secondaryTitle)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.15))
+                    .cornerRadius(6)
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .frame(maxWidth: SetupScreenMetrics.buttonStackWidth)
+        .allowsHitTesting(isInteractionEnabled)
+    }
+}
+
+struct SetupButtonStackPlacement<Buttons: View>: View {
+    let headerBlockHeight: CGFloat
+    @ViewBuilder let buttons: () -> Buttons
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 0)
+            
+            VStack(spacing: 0) {
+                Color.clear
+                    .frame(height: headerBlockHeight)
+                
+                buttons()
+                    .padding(.top, SetupScreenMetrics.buttonTopPadding)
+            }
+            .offset(y: SetupScreenMetrics.contentVerticalOffset)
+            
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
 struct PickColorWheelHint: View {
     @State private var isArrowPulsing = false
     
@@ -111,45 +184,26 @@ struct TeamColorWheelSelectionView: View {
                     }
                     .offset(y: 2)
                     
-                    VStack(spacing: 6) {
-                        Button(action: advanceToNext) {
-                            Text("Next")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.black)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 5)
-                                .background(Color.white)
-                                .cornerRadius(6)
-                                .scaleEffect(isNextPulsing ? 1.03 : 0.98)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .allowsHitTesting(!isAdvancing)
-                        .onAppear {
-                            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
-                                isNextPulsing = true
-                            }
-                        }
-                        
-                        Button(action: onCancel) {
-                            Text("Cancel")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 5)
-                                .background(Color.white.opacity(0.15))
-                                .cornerRadius(6)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .allowsHitTesting(!isAdvancing)
-                    }
-                    .frame(maxWidth: 120)
-                    .padding(.top, 26)
+                    SetupActionButtons(
+                        primaryTitle: "Next",
+                        primaryAction: advanceToNext,
+                        secondaryTitle: "Cancel",
+                        secondaryAction: onCancel,
+                        isPrimaryPulsing: isNextPulsing,
+                        isInteractionEnabled: !isAdvancing
+                    )
+                    .padding(.top, SetupScreenMetrics.buttonTopPadding)
                 }
-                .offset(y: 10)
+                .offset(y: SetupScreenMetrics.contentVerticalOffset)
                 
                 Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+                    isNextPulsing = true
+                }
+            }
             .allowsHitTesting(!isAdvancing)
         }
         .overlay {
@@ -265,11 +319,12 @@ struct TimeDurationPicker: View {
         GeometryReader { proxy in
             let width = proxy.size.width
             let isLarge = width > 175
-            let titleSize: CGFloat = isLarge ? 18 : 16
-            let pickerFontSize: CGFloat = isLarge ? 18 : 16
+            let pickerFontSize: CGFloat = isLarge ? 14 : 13
+            let pickerHeight: CGFloat = isLarge ? 68 : 60
+            let pickerWidth: CGFloat = min(72, width * 0.34)
             
             VStack(spacing: 4) {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     VStack(spacing: 2) {
                         Picker("Hours", selection: $hours) {
                             ForEach(hourRange, id: \.self) { h in
@@ -282,10 +337,11 @@ struct TimeDurationPicker: View {
                         .background(Color(hex: "#228B22"))
                         .overlay(Color.clear)
                         .disabled(isUnlimited)
-                        .frame(height: isLarge ? 96 : 86)
+                        .frame(width: pickerWidth, height: pickerHeight)
                         .clipped()
                     }
                     .background(Color(hex: "#228B22"))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                     
                     VStack(spacing: 2) {
                         Picker("Minutes", selection: $minutes) {
@@ -299,14 +355,14 @@ struct TimeDurationPicker: View {
                         .background(Color(hex: "#228B22"))
                         .overlay(Color.clear)
                         .disabled(isUnlimited)
-                        .frame(height: isLarge ? 96 : 86)
+                        .frame(width: pickerWidth, height: pickerHeight)
                         .clipped()
                     }
                     .background(Color(hex: "#228B22"))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
-                .padding(.top, -10)
+                .padding(.top, 8)
                 
-                // No time limit checkbox (moved below pickers)
                 Button {
                     isUnlimited.toggle()
                     if isUnlimited {
@@ -315,35 +371,31 @@ struct TimeDurationPicker: View {
                         totalMinutes = hours * 60 + minutes
                     }
                 } label: {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 5) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 5)
+                            RoundedRectangle(cornerRadius: 3)
                                 .fill(isUnlimited ? Color.white : Color.clear)
-                                .frame(width: 18, height: 18)
+                                .frame(width: 13, height: 13)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 5)
-                                        .stroke(Color.white, lineWidth: 2)
+                                    RoundedRectangle(cornerRadius: 3)
+                                        .stroke(Color.white.opacity(0.75), lineWidth: 1)
                                 )
                             if isUnlimited {
                                 Image(systemName: "checkmark")
-                                    .font(.system(size: 11, weight: .bold))
+                                    .font(.system(size: 8, weight: .bold))
                                     .foregroundColor(.black)
                             }
                         }
                         Text("No time limit")
-                            .font(.system(size: isLarge ? 16 : 14, weight: .semibold))
-                            .foregroundColor(.white)
-                        Spacer(minLength: 0)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
                     }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
-                    .background(Color.white.opacity(0.12))
-                    .clipShape(Capsule())
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(PlainButtonStyle())
-                .padding(.top, 15)
+                .padding(.top, 10)
             }
-            .padding(.top, -28)
+            .padding(.top, 12)
             .onAppear {
                 if totalMinutes == 0 {
                     isUnlimited = true
@@ -374,6 +426,7 @@ struct FootballSetupView: View {
     @State private var currentStep = 0 // 0: Team 1, 1: Team 2, 2: Time
     @State private var showingScoreboard = false
     @State private var dismissToMain = false
+    @State private var isStartPulsing = false
     let themeColor: Color
     let sportIcon: String
     let showTimePicker: Bool
@@ -428,15 +481,14 @@ struct FootballSetupView: View {
     }
     
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                screenBackgroundColor
-                    .ignoresSafeArea()
-                    .animation(.easeInOut(duration: 0.2), value: team1ColorIndex)
-                    .animation(.easeInOut(duration: 0.2), value: team2ColorIndex)
-                    .animation(.easeInOut(duration: 0.2), value: currentStep)
-                
-                VStack(spacing: 0) {
+        ZStack {
+            screenBackgroundColor
+                .ignoresSafeArea()
+                .animation(.easeInOut(duration: 0.2), value: team1ColorIndex)
+                .animation(.easeInOut(duration: 0.2), value: team2ColorIndex)
+                .animation(.easeInOut(duration: 0.2), value: currentStep)
+            
+            VStack(spacing: 0) {
                     Group {
                         switch currentStep {
                         case 0:
@@ -465,72 +517,53 @@ struct FootballSetupView: View {
                             )
                         default:
                             if showTimePicker {
-                                VStack(spacing: 12) {
+                                ZStack(alignment: .top) {
                                     TimeDurationPicker(totalMinutes: $selectedTime)
-                                    Spacer(minLength: 0)
+                                        .padding(.top, 24)
+                                    
+                                    SetupButtonStackPlacement(
+                                        headerBlockHeight: SetupScreenMetrics.headerBlockHeight
+                                    ) {
+                                        SetupActionButtons(
+                                            primaryTitle: "Start",
+                                            primaryAction: { showingScoreboard = true },
+                                            secondaryTitle: "Cancel",
+                                            secondaryAction: { currentStep = 1 },
+                                            isPrimaryPulsing: isStartPulsing
+                                        )
+                                    }
                                 }
-                                .padding(.top, -8)
                             }
                         }
                     }
-                    .frame(maxHeight: .infinity, alignment: .center)
-                }
-                
-                if showTimePicker && currentStep == 2 {
-                    VStack {
-                        Spacer()
-                        HStack(spacing: 8) {
-                            Button {
-                                currentStep = 1
-                            } label: {
-                                Text("Back")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .background(Color.white.opacity(0.15))
-                                    .cornerRadius(8)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            Button {
-                                showingScoreboard = true
-                            } label: {
-                                Text("Start Game")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(.black)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .background(Color.white)
-                                    .cornerRadius(8)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(themeColor)
-                        .frame(maxWidth: .infinity)
-                    }
-                    .position(x: geometry.size.width / 2, y: geometry.size.height - 50)
-                }
+                .frame(maxHeight: .infinity, alignment: .center)
             }
-            .contentShape(Rectangle())
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 16)
-                    .onEnded { value in
-                        guard currentStep == 2 else { return }
-                        let horizontal = value.translation.width
-                        let vertical = value.translation.height
-                        if abs(horizontal) > abs(vertical), horizontal > 28 {
-                            cancelFromCurrentStep()
-                        }
-                    }
-            )
         }
+        .contentShape(Rectangle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 16)
+                .onEnded { value in
+                    guard currentStep == 2 else { return }
+                    let horizontal = value.translation.width
+                    let vertical = value.translation.height
+                    if abs(horizontal) > abs(vertical), horizontal > 28 {
+                        cancelFromCurrentStep()
+                    }
+                }
+        )
         .onChange(of: team1ColorIndex) { _, _ in
             if team2ColorIndex == team1ColorIndex,
                let fallback = team2ColorIndices.first {
                 team2ColorIndex = fallback
+            }
+        }
+        .onChange(of: currentStep) { _, step in
+            if step == 2 && showTimePicker {
+                withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+                    isStartPulsing = true
+                }
+            } else {
+                isStartPulsing = false
             }
         }
         .navigationBarHidden(true)
