@@ -26,6 +26,17 @@ enum TeamColor: Int, CaseIterable {
     }
 }
 
+struct PickColorWheelHint: View {
+    var body: some View {
+        Text("Color")
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundColor(.white.opacity(0.9))
+            .fixedSize()
+            .rotationEffect(.degrees(-90))
+            .frame(width: 58, height: 12)
+    }
+}
+
 struct TeamColorWheelSelectionView: View {
     let teamNumber: Int
     let sportIcon: String
@@ -37,79 +48,112 @@ struct TeamColorWheelSelectionView: View {
     @State private var wheelSlot = 0
     @State private var crownSlot: Double = 0
     @State private var isNextPulsing = false
+    @State private var iconSpin: Double = 0
+    @State private var isAdvancing = false
+    @FocusState private var isCrownFocused: Bool
+    
+    private static let spinDuration: TimeInterval = 0.7
     
     private var maxWheelSlot: Int {
         max(availableColorIndices.count - 1, 0)
     }
     
+    private var crownWheelControl: some View {
+        PickColorWheelHint()
+            .frame(width: 14, height: 62)
+            .contentShape(Rectangle())
+            .focusable(true)
+            .focused($isCrownFocused)
+            .digitalCrownRotation(
+                $crownSlot,
+                from: 0,
+                through: Double(max(maxWheelSlot, 0)),
+                by: 1,
+                sensitivity: .medium,
+                isContinuous: true,
+                isHapticFeedbackEnabled: true
+            )
+    }
+    
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 0)
-            
+        ZStack {
             VStack(spacing: 0) {
-                VStack(spacing: 10) {
-                    Image(systemName: sportIcon)
-                        .font(.system(size: 32, weight: .medium))
-                        .foregroundColor(.white)
-                    
-                    Text("Set Team #\(teamNumber)")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(.white)
-                        .multilineTextAlignment(.center)
-                }
-                .offset(y: 12)
+                Spacer(minLength: 0)
                 
-                VStack(spacing: 6) {
-                    Button(action: onNext) {
-                        Text("Next")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.black)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 5)
-                            .background(Color.white)
-                            .cornerRadius(6)
-                            .scaleEffect(isNextPulsing ? 1.03 : 0.98)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .onAppear {
-                        withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
-                            isNextPulsing = true
-                        }
-                    }
-                    
-                    Button(action: onCancel) {
-                        Text("Cancel")
-                            .font(.system(size: 12, weight: .medium))
+                VStack(spacing: 0) {
+                    VStack(spacing: 8) {
+                        Text("Team #\(teamNumber)")
+                            .font(.system(size: 22, weight: .bold))
                             .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 5)
-                            .background(Color.white.opacity(0.15))
-                            .cornerRadius(6)
+                            .multilineTextAlignment(.center)
+                        
+                        Image(systemName: sportIcon)
+                            .font(.system(size: 46, weight: .medium))
+                            .foregroundColor(.white)
+                            .rotationEffect(.degrees(iconSpin))
+                            .animation(.easeInOut(duration: Self.spinDuration), value: iconSpin)
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    .offset(y: 2)
+                    
+                    VStack(spacing: 6) {
+                        Button(action: advanceToNext) {
+                            Text("Next")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.black)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 5)
+                                .background(Color.white)
+                                .cornerRadius(6)
+                                .scaleEffect(isNextPulsing ? 1.03 : 0.98)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .allowsHitTesting(!isAdvancing)
+                        .onAppear {
+                            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+                                isNextPulsing = true
+                            }
+                        }
+                        
+                        Button(action: onCancel) {
+                            Text("Cancel")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 5)
+                                .background(Color.white.opacity(0.15))
+                                .cornerRadius(6)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .allowsHitTesting(!isAdvancing)
+                    }
+                    .frame(maxWidth: 120)
+                    .padding(.top, 26)
                 }
-                .frame(maxWidth: 120)
-                .padding(.top, 20)
+                .offset(y: 10)
+                
+                Spacer(minLength: 0)
             }
-            .offset(y: -18)
-            
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .allowsHitTesting(!isAdvancing)
+        }
+        .overlay {
+            GeometryReader { proxy in
+                crownWheelControl
+                    .allowsHitTesting(!isAdvancing)
+                    .position(
+                        x: proxy.size.width - 7,
+                        y: proxy.size.height * 0.33
+                    )
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .scrollIndicators(.hidden)
         .contentShape(Rectangle())
-        .focusable(true)
-        .digitalCrownRotation(
-            $crownSlot,
-            from: 0,
-            through: Double(maxWheelSlot),
-            by: 1,
-            sensitivity: .medium,
-            isContinuous: false,
-            isHapticFeedbackEnabled: true
-        )
         .gesture(
             DragGesture(minimumDistance: 12)
                 .onEnded { value in
+                    guard !isAdvancing else { return }
+                    
                     let horizontal = value.translation.width
                     let vertical = value.translation.height
                     
@@ -127,7 +171,10 @@ struct TeamColorWheelSelectionView: View {
                 }
         )
         .onAppear {
+            iconSpin = 0
+            isAdvancing = false
             syncWheelFromColorIndex()
+            isCrownFocused = true
         }
         .onChange(of: crownSlot) { _, newValue in
             let slot = min(max(Int(newValue.rounded()), 0), maxWheelSlot)
@@ -165,8 +212,26 @@ struct TeamColorWheelSelectionView: View {
     }
     
     private func stepColor(by delta: Int) {
+        guard !isAdvancing else { return }
         let nextSlot = (wheelSlot + delta + availableColorIndices.count) % availableColorIndices.count
         applySlot(nextSlot)
+    }
+    
+    private func advanceToNext() {
+        guard !isAdvancing else { return }
+        isAdvancing = true
+        isCrownFocused = false
+        iconSpin = 0
+        
+        withAnimation(.easeInOut(duration: Self.spinDuration)) {
+            iconSpin = 360
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.spinDuration) {
+            isAdvancing = false
+            iconSpin = 0
+            onNext()
+        }
     }
 }
 
@@ -286,6 +351,7 @@ struct TimeDurationPicker: View {
 
 struct FootballSetupView: View {
     @Environment(\.dismiss) private var dismiss
+    var onDismissToSportList: (() -> Void)? = nil
     @State private var team1ColorIndex = TeamColor.red.rawValue
     @State private var team2ColorIndex = TeamColor.blue.rawValue
     @State private var selectedTime = 90
@@ -324,16 +390,24 @@ struct FootballSetupView: View {
         [45, 60, 75, 90, 105, 120] // Common football match durations
     }
     
+    private func exitToSportList() {
+        if let onDismissToSportList {
+            onDismissToSportList()
+        } else {
+            dismiss()
+        }
+    }
+    
     private func cancelFromCurrentStep() {
         switch currentStep {
         case 0:
-            dismiss()
+            exitToSportList()
         case 1:
             currentStep = 0
         case 2 where showTimePicker:
             currentStep = 1
         default:
-            dismiss()
+            exitToSportList()
         }
     }
     
@@ -454,7 +528,7 @@ struct FootballSetupView: View {
         }
         .onChange(of: dismissToMain) { _, newValue in
             if newValue {
-                dismiss()
+                exitToSportList()
             }
         }
     }
@@ -618,33 +692,86 @@ struct ScoreboardView: View {
 
 struct SportCard: View {
     let sport: Sport
+    let isSelectionEnabled: Bool
+    let onSelectionBegin: () -> Void
     let action: () -> Void
-    @State private var isAnimating = false
+    
+    @State private var isRocking = false
+    @State private var selectionSpin: Double = 0
+    @State private var isSelecting = false
+    
+    private static let spinDuration: TimeInterval = 0.7
+    
+    private var iconScale: CGFloat {
+        isSelecting ? 1.0 : (isRocking ? 1.15 : 0.95)
+    }
+    
+    private var iconRotation: Double {
+        isSelecting ? selectionSpin : (isRocking ? 8 : -8)
+    }
     
     var body: some View {
         ZStack {
-            // Full screen background
             sport.color
                 .ignoresSafeArea()
             
-            // Content
-            Button(action: action) {
+            Button(action: selectSport) {
                 Image(systemName: sport.icon)
                     .font(.system(size: 80, weight: .medium))
                     .foregroundColor(.white)
-                    .scaleEffect(isAnimating ? 1.15 : 0.95)
-                    .rotationEffect(.degrees(isAnimating ? 8 : -8))
+                    .scaleEffect(iconScale)
+                    .rotationEffect(.degrees(iconRotation))
                     .animation(
-                        Animation.easeInOut(duration: 2.0)
-                            .repeatForever(autoreverses: true),
-                        value: isAnimating
+                        .easeInOut(duration: Self.spinDuration),
+                        value: selectionSpin
+                    )
+                    .animation(
+                        .easeInOut(duration: 2.0).repeatForever(autoreverses: true),
+                        value: isRocking
                     )
             }
             .buttonStyle(PlainButtonStyle())
+            .allowsHitTesting(isSelectionEnabled && !isSelecting)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            isAnimating = true
+            resetRockAnimation()
+        }
+        .onDisappear {
+            isRocking = false
+            isSelecting = false
+            selectionSpin = 0
+        }
+        .onChange(of: isSelectionEnabled) { _, enabled in
+            if enabled {
+                resetRockAnimation()
+            }
+        }
+    }
+    
+    private func resetRockAnimation() {
+        isSelecting = false
+        selectionSpin = 0
+        isRocking = false
+        DispatchQueue.main.async {
+            isRocking = true
+        }
+    }
+    
+    private func selectSport() {
+        guard isSelectionEnabled, !isSelecting else { return }
+        isSelecting = true
+        onSelectionBegin()
+        isRocking = false
+        selectionSpin = 0
+        
+        withAnimation(.easeInOut(duration: Self.spinDuration)) {
+            selectionSpin = 360
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.spinDuration) {
+            isSelecting = false
+            action()
         }
     }
 }
@@ -665,54 +792,82 @@ struct ContentView: View {
     
     @State private var currentIndex = 0
     @State private var isTransitioning = false
-    @State private var showingFootballSetup = false
+    @State private var showingSetup = false
+    @State private var setupCoverOpacity: Double = 1
+    @State private var isSelectingSport = false
     @State private var setupThemeColor: Color = Color(hex: "#228B22")
     @State private var setupSportIcon: String = "soccerball"
     @State private var setupShowTimePicker: Bool = true
     
     var body: some View {
-        GeometryReader { geometry in
-            ScrollView(.vertical, showsIndicators: false) {
-                LazyVStack(spacing: 0) {
-                    ForEach(Array(sports.enumerated()), id: \.offset) { index, sport in
-                        SportCard(sport: sport) {
-                            setupThemeColor = sport.color
-                            setupSportIcon = sport.icon
-                            setupShowTimePicker = (sport.name == "Football")
-                            showingFootballSetup = true
+        ZStack {
+            GeometryReader { geometry in
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(sports.enumerated()), id: \.offset) { index, sport in
+                            SportCard(
+                                sport: sport,
+                                isSelectionEnabled: !showingSetup && !isSelectingSport,
+                                onSelectionBegin: { isSelectingSport = true }
+                            ) {
+                                beginSetup(for: sport)
+                            }
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .scaleEffect(isTransitioning ? 0.85 : 1.0)
+                            .opacity(isTransitioning ? 0.6 : 1.0)
+                            .animation(
+                                Animation.spring(response: 0.5, dampingFraction: 0.7, blendDuration: 0.4),
+                                value: isTransitioning
+                            )
                         }
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .scaleEffect(isTransitioning ? 0.85 : 1.0)
-                        .opacity(isTransitioning ? 0.6 : 1.0)
-                        .animation(
-                            Animation.spring(response: 0.5, dampingFraction: 0.7, blendDuration: 0.4),
-                            value: isTransitioning
-                        )
                     }
                 }
-            }
-            .scrollTargetBehavior(.paging)
-            .onChange(of: currentIndex) { _, _ in
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    isTransitioning = true
-                }
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                .scrollTargetBehavior(.paging)
+                .scrollDisabled(isSelectingSport || showingSetup)
+                .onChange(of: currentIndex) { _, _ in
                     withAnimation(.easeInOut(duration: 0.25)) {
-                        isTransitioning = false
+                        isTransitioning = true
+                    }
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            isTransitioning = false
+                        }
                     }
                 }
             }
-        }
-        .ignoresSafeArea()
-        .sheet(isPresented: $showingFootballSetup) {
-            NavigationView {
+            .allowsHitTesting(!showingSetup && !isSelectingSport)
+            
+            if showingSetup {
                 FootballSetupView(
+                    onDismissToSportList: exitSetup,
                     themeColor: setupThemeColor,
                     sportIcon: setupSportIcon,
                     showTimePicker: setupShowTimePicker
                 )
+                .opacity(setupCoverOpacity)
             }
+        }
+        .ignoresSafeArea()
+    }
+    
+    private func beginSetup(for sport: Sport) {
+        setupThemeColor = sport.color
+        setupSportIcon = sport.icon
+        setupShowTimePicker = (sport.name == "Football")
+        isSelectingSport = false
+        setupCoverOpacity = 1
+        showingSetup = true
+    }
+    
+    private func exitSetup() {
+        isSelectingSport = false
+        withAnimation(.easeInOut(duration: 0.25)) {
+            setupCoverOpacity = 0
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            showingSetup = false
+            setupCoverOpacity = 1
         }
     }
 }
