@@ -795,6 +795,7 @@ private struct ScoreSnapshot: Equatable {
 
 private struct TeamScoreBall: View {
     let color: Color
+    let spinDegrees: Double
     let onIncrement: () -> Void
     let onDecrement: () -> Void
     
@@ -803,6 +804,8 @@ private struct TeamScoreBall: View {
             .font(.system(size: 48, weight: .medium))
             .foregroundStyle(color)
             .symbolRenderingMode(.monochrome)
+            .rotationEffect(.degrees(spinDegrees))
+            .animation(.easeInOut(duration: TeamScoreBall.spinDuration), value: spinDegrees)
             .frame(width: 52, height: 52)
             .contentShape(Rectangle())
             .onTapGesture(perform: onIncrement)
@@ -814,6 +817,8 @@ private struct TeamScoreBall: View {
                 }
             )
     }
+    
+    static let spinDuration: TimeInterval = 0.7
 }
 
 private func scoreDecrementDrag(onDecrement: @escaping () -> Void) -> some Gesture {
@@ -838,6 +843,9 @@ struct ScoreboardView: View {
     @State private var isGameActive = true
     @State private var showingFinishAlert = false
     @State private var scoreHistory: [ScoreSnapshot] = []
+    @State private var isScoreIncreaseLocked = false
+    @State private var team1Spin: Double = 0
+    @State private var team2Spin: Double = 0
     
     init(
         team1Color: Color,
@@ -885,11 +893,12 @@ struct ScoreboardView: View {
                     
                     // Score display: team ball | score - score | team ball
                     HStack(spacing: 10) {
-                        TeamScoreBall(color: team1Color) {
-                            adjustTeam1Score(by: 1)
-                        } onDecrement: {
-                            adjustTeam1Score(by: -1)
-                        }
+                        TeamScoreBall(
+                            color: team1Color,
+                            spinDegrees: team1Spin,
+                            onIncrement: { scoreGoal(for: 1) },
+                            onDecrement: { adjustTeam1Score(by: -1) }
+                        )
                         
                         HStack(spacing: 6) {
                             Text("\(team1Score)")
@@ -897,7 +906,7 @@ struct ScoreboardView: View {
                                 .foregroundColor(.white)
                                 .monospacedDigit()
                                 .contentShape(Rectangle())
-                                .onTapGesture { adjustTeam1Score(by: 1) }
+                                .onTapGesture { scoreGoal(for: 1) }
                                 .gesture(scoreDecrementDrag { adjustTeam1Score(by: -1) })
                             
                             Text("-")
@@ -909,15 +918,16 @@ struct ScoreboardView: View {
                                 .foregroundColor(.white)
                                 .monospacedDigit()
                                 .contentShape(Rectangle())
-                                .onTapGesture { adjustTeam2Score(by: 1) }
+                                .onTapGesture { scoreGoal(for: 2) }
                                 .gesture(scoreDecrementDrag { adjustTeam2Score(by: -1) })
                         }
                         
-                        TeamScoreBall(color: team2Color) {
-                            adjustTeam2Score(by: 1)
-                        } onDecrement: {
-                            adjustTeam2Score(by: -1)
-                        }
+                        TeamScoreBall(
+                            color: team2Color,
+                            spinDegrees: team2Spin,
+                            onIncrement: { scoreGoal(for: 2) },
+                            onDecrement: { adjustTeam2Score(by: -1) }
+                        )
                     }
                     .padding(.top, 10)
                     .offset(y: 2)
@@ -998,8 +1008,34 @@ struct ScoreboardView: View {
         scoreHistory.append(ScoreSnapshot(team1: team1Score, team2: team2Score))
     }
     
+    private func scoreGoal(for team: Int) {
+        guard !isScoreIncreaseLocked else { return }
+        isScoreIncreaseLocked = true
+        
+        pushScoreHistory()
+        switch team {
+        case 1:
+            team1Score += 1
+            withAnimation(.easeInOut(duration: TeamScoreBall.spinDuration)) {
+                team1Spin += 360
+            }
+        case 2:
+            team2Score += 1
+            withAnimation(.easeInOut(duration: TeamScoreBall.spinDuration)) {
+                team2Spin += 360
+            }
+        default:
+            isScoreIncreaseLocked = false
+            return
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + TeamScoreBall.spinDuration) {
+            isScoreIncreaseLocked = false
+        }
+    }
+    
     private func adjustTeam1Score(by delta: Int) {
-        guard delta != 0 else { return }
+        guard delta < 0 else { return }
         let newScore = team1Score + delta
         guard newScore >= 0 else { return }
         pushScoreHistory()
@@ -1007,7 +1043,7 @@ struct ScoreboardView: View {
     }
     
     private func adjustTeam2Score(by delta: Int) {
-        guard delta != 0 else { return }
+        guard delta < 0 else { return }
         let newScore = team2Score + delta
         guard newScore >= 0 else { return }
         pushScoreHistory()
