@@ -309,7 +309,7 @@ struct TimeDurationPicker: View {
     @Binding var totalMinutes: Int
     
     @State private var hours: Int = 1
-    @State private var minutes: Int = 30
+    @State private var minutes: Int = 0
     @State private var isUnlimited: Bool = false
     
     private let hourRange: [Int] = Array(0...2) // 0h to 2h (0-120 min)
@@ -334,13 +334,13 @@ struct TimeDurationPicker: View {
                             }
                         }
                         .pickerStyle(.wheel)
-                        .background(Color(hex: "#228B22"))
+                        .background(Color.black)
                         .overlay(Color.clear)
                         .disabled(isUnlimited)
                         .frame(width: pickerWidth, height: pickerHeight)
                         .clipped()
                     }
-                    .background(Color(hex: "#228B22"))
+                    .background(Color.black)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     
                     VStack(spacing: 2) {
@@ -352,13 +352,13 @@ struct TimeDurationPicker: View {
                             }
                         }
                         .pickerStyle(.wheel)
-                        .background(Color(hex: "#228B22"))
+                        .background(Color.black)
                         .overlay(Color.clear)
                         .disabled(isUnlimited)
                         .frame(width: pickerWidth, height: pickerHeight)
                         .clipped()
                     }
-                    .background(Color(hex: "#228B22"))
+                    .background(Color.black)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .padding(.top, 8)
@@ -422,14 +422,13 @@ struct FootballSetupView: View {
     var onDismissToSportList: (() -> Void)? = nil
     @State private var team1ColorIndex = TeamColor.red.rawValue
     @State private var team2ColorIndex = TeamColor.blue.rawValue
-    @State private var selectedTime = 90
+    @State private var selectedTime = 60
     @State private var currentStep = 0 // 0: Team 1, 1: Team 2, 2: Time
     @State private var showingScoreboard = false
     @State private var dismissToMain = false
     @State private var isStartPulsing = false
     let themeColor: Color
     let sportIcon: String
-    let showTimePicker: Bool
     
     private var allColorIndices: [Int] {
         TeamColor.allCases.map(\.rawValue)
@@ -451,7 +450,7 @@ struct FootballSetupView: View {
         switch currentStep {
         case 0: selectedTeam1Color
         case 1: selectedTeam2Color
-        default: themeColor
+        default: .black
         }
     }
     
@@ -473,7 +472,7 @@ struct FootballSetupView: View {
             exitToSportList()
         case 1:
             currentStep = 0
-        case 2 where showTimePicker:
+        case 2:
             currentStep = 1
         default:
             exitToSportList()
@@ -506,32 +505,24 @@ struct FootballSetupView: View {
                                 sportIcon: sportIcon,
                                 colorIndex: $team2ColorIndex,
                                 availableColorIndices: team2ColorIndices,
-                                onNext: {
-                                    if showTimePicker {
-                                        currentStep = 2
-                                    } else {
-                                        showingScoreboard = true
-                                    }
-                                },
+                                onNext: { currentStep = 2 },
                                 onCancel: cancelFromCurrentStep
                             )
                         default:
-                            if showTimePicker {
-                                ZStack(alignment: .top) {
-                                    TimeDurationPicker(totalMinutes: $selectedTime)
-                                        .padding(.top, 24)
-                                    
-                                    SetupButtonStackPlacement(
-                                        headerBlockHeight: SetupScreenMetrics.headerBlockHeight
-                                    ) {
-                                        SetupActionButtons(
-                                            primaryTitle: "Start",
-                                            primaryAction: { showingScoreboard = true },
-                                            secondaryTitle: "Cancel",
-                                            secondaryAction: { currentStep = 1 },
-                                            isPrimaryPulsing: isStartPulsing
-                                        )
-                                    }
+                            ZStack(alignment: .top) {
+                                TimeDurationPicker(totalMinutes: $selectedTime)
+                                    .padding(.top, 24)
+                                
+                                SetupButtonStackPlacement(
+                                    headerBlockHeight: SetupScreenMetrics.headerBlockHeight
+                                ) {
+                                    SetupActionButtons(
+                                        primaryTitle: "Start",
+                                        primaryAction: { showingScoreboard = true },
+                                        secondaryTitle: "Cancel",
+                                        secondaryAction: { currentStep = 1 },
+                                        isPrimaryPulsing: isStartPulsing
+                                    )
                                 }
                             }
                         }
@@ -558,7 +549,7 @@ struct FootballSetupView: View {
             }
         }
         .onChange(of: currentStep) { _, step in
-            if step == 2 && showTimePicker {
+            if step == 2 {
                 withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
                     isStartPulsing = true
                 }
@@ -846,7 +837,6 @@ struct ContentView: View {
     @State private var isSelectingSport = false
     @State private var setupThemeColor: Color = Color(hex: "#228B22")
     @State private var setupSportIcon: String = "soccerball"
-    @State private var setupShowTimePicker: Bool = true
     
     var body: some View {
         ZStack {
@@ -891,8 +881,7 @@ struct ContentView: View {
                 FootballSetupView(
                     onDismissToSportList: exitSetup,
                     themeColor: setupThemeColor,
-                    sportIcon: setupSportIcon,
-                    showTimePicker: setupShowTimePicker
+                    sportIcon: setupSportIcon
                 )
                 .opacity(setupCoverOpacity)
             }
@@ -903,7 +892,6 @@ struct ContentView: View {
     private func beginSetup(for sport: Sport) {
         setupThemeColor = sport.color
         setupSportIcon = sport.icon
-        setupShowTimePicker = (sport.name == "Football")
         isSelectingSport = false
         setupCoverOpacity = 1
         showingSetup = true
