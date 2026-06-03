@@ -27,13 +27,29 @@ enum TeamColor: Int, CaseIterable {
 }
 
 struct PickColorWheelHint: View {
+    @State private var isArrowPulsing = false
+    
     var body: some View {
-        Text("Color")
-            .font(.system(size: 9, weight: .semibold))
-            .foregroundColor(.white.opacity(0.9))
-            .fixedSize()
-            .rotationEffect(.degrees(-90))
-            .frame(width: 58, height: 12)
+        ZStack {
+            Text("Color")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(.white.opacity(0.9))
+                .fixedSize()
+                .rotationEffect(.degrees(-90))
+            
+            Image(systemName: "chevron.right")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundColor(.white)
+                .opacity(isArrowPulsing ? 0.95 : 0.2)
+                .offset(x: 8)
+        }
+        .frame(width: 26, height: 62)
+        .allowsHitTesting(false)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+                isArrowPulsing = true
+            }
+        }
     }
 }
 
@@ -60,7 +76,7 @@ struct TeamColorWheelSelectionView: View {
     
     private var crownWheelControl: some View {
         PickColorWheelHint()
-            .frame(width: 14, height: 62)
+            .frame(width: 26, height: 62)
             .contentShape(Rectangle())
             .focusable(true)
             .focused($isCrownFocused)
@@ -141,7 +157,7 @@ struct TeamColorWheelSelectionView: View {
                 crownWheelControl
                     .allowsHitTesting(!isAdvancing)
                     .position(
-                        x: proxy.size.width - 7,
+                        x: proxy.size.width - 16,
                         y: proxy.size.height * 0.26
                     )
             }
