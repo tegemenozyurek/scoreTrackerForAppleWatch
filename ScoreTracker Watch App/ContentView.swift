@@ -39,6 +39,8 @@ struct SetupActionButtons: View {
     let primaryAction: () -> Void
     let secondaryTitle: String
     let secondaryAction: () -> Void
+    var primaryBackgroundColor: Color = .white
+    var primaryForegroundColor: Color = .black
     var isPrimaryPulsing: Bool = false
     var isInteractionEnabled: Bool = true
     
@@ -47,10 +49,10 @@ struct SetupActionButtons: View {
             Button(action: primaryAction) {
                 Text(primaryTitle)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.black)
+                    .foregroundColor(primaryForegroundColor)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 5)
-                    .background(Color.white)
+                    .background(primaryBackgroundColor)
                     .cornerRadius(6)
                     .scaleEffect(isPrimaryPulsing ? 1.03 : 0.98)
                     .animation(
@@ -626,6 +628,8 @@ struct FootballSetupView: View {
                                         primaryAction: { showingScoreboard = true },
                                         secondaryTitle: "Cancel",
                                         secondaryAction: { currentStep = 1 },
+                                        primaryBackgroundColor: themeColor,
+                                        primaryForegroundColor: .white,
                                         isPrimaryPulsing: isStartPulsing
                                     )
                                 }
