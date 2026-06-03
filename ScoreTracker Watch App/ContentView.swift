@@ -772,14 +772,14 @@ private struct MatchControlButton<Icon: View>: View {
     let action: () -> Void
     @ViewBuilder let icon: () -> Icon
     
-    private let size: CGFloat = 44
+    private let size: CGFloat = 38
     
     var body: some View {
         Button(action: action) {
             icon()
                 .frame(width: size, height: size)
                 .background(backgroundColor)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(!isEnabled)
@@ -923,14 +923,14 @@ struct ScoreboardView: View {
                     .offset(y: 2)
                     .overlay(alignment: .bottom) {
                         Text(timeString)
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(.white.opacity(0.85))
                             .offset(y: 26)
                     }
                     
                     Spacer(minLength: 0)
                     
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         MatchControlButton(
                             backgroundColor: .yellow,
                             accessibilityLabel: "Revert last score",
@@ -938,7 +938,7 @@ struct ScoreboardView: View {
                             action: revertLastScoreChange
                         ) {
                             Image(systemName: "arrow.uturn.backward")
-                                .font(.system(size: 18, weight: .bold))
+                                .font(.system(size: 15, weight: .bold))
                                 .foregroundColor(.white)
                         }
                         
@@ -949,7 +949,7 @@ struct ScoreboardView: View {
                             action: { isGameActive.toggle() }
                         ) {
                             Image(systemName: isGameActive ? "pause.fill" : "play.fill")
-                                .font(.system(size: 18, weight: .bold))
+                                .font(.system(size: 15, weight: .bold))
                                 .foregroundColor(.white)
                         }
                         
@@ -963,13 +963,13 @@ struct ScoreboardView: View {
                                 .renderingMode(.template)
                                 .resizable()
                                 .scaledToFit()
-                                .frame(width: 22, height: 22)
+                                .frame(width: 18, height: 18)
                                 .foregroundStyle(.white)
                         }
                     }
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 4)
-                    .offset(y: 8)
+                    .padding(.bottom, 0)
+                    .offset(y: 28)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
