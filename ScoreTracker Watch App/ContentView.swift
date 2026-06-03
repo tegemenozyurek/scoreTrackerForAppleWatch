@@ -408,38 +408,51 @@ struct TimeDurationPicker: View {
             let width = proxy.size.width
             let isLarge = width > 175
             let pickerFontSize: CGFloat = isLarge ? 18 : 16
-            let pickerHeight: CGFloat = isLarge ? 68 : 60
+            let pickerHeight: CGFloat = isLarge ? 48 : 42
             let pickerWidth: CGFloat = min(72, width * 0.34)
             
             VStack(spacing: 4) {
-                HStack(spacing: 6) {
-                    DurationWheelColumn(
-                        value: $hours,
-                        options: hourRange,
-                        format: { "\($0)" },
-                        pickerFontSize: pickerFontSize,
-                        width: pickerWidth,
-                        height: pickerHeight,
-                        accentColor: accentColor,
-                        isActive: highlightedPicker == .hours
-                    )
-                    .onTapGesture { selectDurationPicker(.hours) }
-                    .focused($focusedPicker, equals: .hours)
+                HStack(alignment: .top, spacing: 6) {
+                    VStack(spacing: 3) {
+                        DurationWheelColumn(
+                            value: $hours,
+                            options: hourRange,
+                            format: { "\($0)" },
+                            pickerFontSize: pickerFontSize,
+                            width: pickerWidth,
+                            height: pickerHeight,
+                            accentColor: accentColor,
+                            isActive: highlightedPicker == .hours
+                        )
+                        .onTapGesture { selectDurationPicker(.hours) }
+                        .focused($focusedPicker, equals: .hours)
+                        
+                        Text("hour(s)")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(.white.opacity(0.55))
+                            .frame(width: pickerWidth)
+                    }
                     
-                    DurationWheelColumn(
-                        value: $minutes,
-                        options: minuteStepRange,
-                        format: { String(format: "%02d", $0) },
-                        pickerFontSize: pickerFontSize,
-                        width: pickerWidth,
-                        height: pickerHeight,
-                        accentColor: accentColor,
-                        isActive: highlightedPicker == .minutes
-                    )
-                    .onTapGesture { selectDurationPicker(.minutes) }
-                    .focused($focusedPicker, equals: .minutes)
+                    VStack(spacing: 3) {
+                        DurationWheelColumn(
+                            value: $minutes,
+                            options: minuteStepRange,
+                            format: { String(format: "%02d", $0) },
+                            pickerFontSize: pickerFontSize,
+                            width: pickerWidth,
+                            height: pickerHeight,
+                            accentColor: accentColor,
+                            isActive: highlightedPicker == .minutes
+                        )
+                        .onTapGesture { selectDurationPicker(.minutes) }
+                        .focused($focusedPicker, equals: .minutes)
+                        
+                        Text("minute(s)")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(.white.opacity(0.55))
+                            .frame(width: pickerWidth)
+                    }
                 }
-                .padding(.top, 8)
                 .disabled(isUnlimited)
                 
                 Button {
@@ -474,7 +487,7 @@ struct TimeDurationPicker: View {
                 .buttonStyle(PlainButtonStyle())
                 .padding(.top, 10)
             }
-            .padding(.top, 12)
+            .padding(.top, 32)
             .onAppear {
                 if totalMinutes == 0 {
                     isUnlimited = true
