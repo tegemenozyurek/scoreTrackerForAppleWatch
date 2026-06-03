@@ -305,14 +305,100 @@ struct TeamColorWheelSelectionView: View {
     }
 }
 
+private struct DurationWheelColumn: View {
+    @Binding var value: Int
+    let options: [Int]
+    let format: (Int) -> String
+    let pickerFontSize: CGFloat
+    let width: CGFloat
+    let height: CGFloat
+    let accentColor: Color
+    let isActive: Bool
+    
+    @State private var crownIndex: Double = 0
+    
+    private var selectedIndex: Int {
+        options.firstIndex(of: value) ?? 0
+    }
+    
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        let borderColor = isActive ? accentColor : Color.white.opacity(0.28)
+        let borderWidth: CGFloat = isActive ? 2.5 : 1
+        let secondaryFontSize = max(11, pickerFontSize - 2)
+        
+        ZStack {
+            shape.fill(Color.black)
+            
+            VStack(spacing: 1) {
+                wheelRow(offset: -1, fontSize: secondaryFontSize)
+                wheelRow(offset: 0, fontSize: pickerFontSize, isCenter: true)
+                wheelRow(offset: 1, fontSize: secondaryFontSize)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            
+            shape.stroke(
+                borderColor,
+                style: StrokeStyle(lineWidth: borderWidth, lineCap: .round, lineJoin: .round)
+            )
+        }
+        .frame(width: width, height: height)
+        .contentShape(shape)
+        .focusable()
+        .digitalCrownRotation(
+            $crownIndex,
+            from: 0,
+            through: Double(max(0, options.count - 1)),
+            by: 1,
+            sensitivity: .medium,
+            isContinuous: false,
+            isHapticFeedbackEnabled: true
+        )
+        .onAppear {
+            crownIndex = Double(selectedIndex)
+        }
+        .onChange(of: value) { _, _ in
+            crownIndex = Double(selectedIndex)
+        }
+        .onChange(of: crownIndex) { _, newIndex in
+            let idx = min(options.count - 1, max(0, Int(newIndex.rounded())))
+            guard options.indices.contains(idx) else { return }
+            value = options[idx]
+        }
+    }
+    
+    @ViewBuilder
+    private func wheelRow(offset: Int, fontSize: CGFloat, isCenter: Bool = false) -> some View {
+        let idx = selectedIndex + offset
+        if options.indices.contains(idx) {
+            Text(format(options[idx]))
+                .font(.system(size: fontSize, weight: isCenter ? .semibold : .regular))
+                .foregroundColor(isCenter ? .white : .white.opacity(0.35))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        } else {
+            Text(" ")
+                .font(.system(size: fontSize))
+        }
+    }
+}
+
 struct TimeDurationPicker: View {
     @Binding var totalMinutes: Int
+    let accentColor: Color
     
     @State private var hours: Int = 1
     @State private var minutes: Int = 0
     @State private var isUnlimited: Bool = false
+    @State private var highlightedPicker: FocusedDurationPicker = .hours
+    @FocusState private var focusedPicker: FocusedDurationPicker?
     
-    private let hourRange: [Int] = Array(0...2) // 0h to 2h (0-120 min)
+    private enum FocusedDurationPicker {
+        case hours
+        case minutes
+    }
+    
+    private let hourRange: [Int] = Array(0...3)
     private let minuteStepRange: [Int] = Array(stride(from: 0, through: 55, by: 5)) // 0,5,10,...55
     
     var body: some View {
@@ -325,43 +411,34 @@ struct TimeDurationPicker: View {
             
             VStack(spacing: 4) {
                 HStack(spacing: 6) {
-                    VStack(spacing: 2) {
-                        Picker("Hours", selection: $hours) {
-                            ForEach(hourRange, id: \.self) { h in
-                                Text("\(h)")
-                                    .font(.system(size: pickerFontSize, weight: .semibold))
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        .pickerStyle(.wheel)
-                        .background(Color.black)
-                        .overlay(Color.clear)
-                        .disabled(isUnlimited)
-                        .frame(width: pickerWidth, height: pickerHeight)
-                        .clipped()
-                    }
-                    .background(Color.black)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    DurationWheelColumn(
+                        value: $hours,
+                        options: hourRange,
+                        format: { "\($0)" },
+                        pickerFontSize: pickerFontSize,
+                        width: pickerWidth,
+                        height: pickerHeight,
+                        accentColor: accentColor,
+                        isActive: highlightedPicker == .hours
+                    )
+                    .onTapGesture { selectDurationPicker(.hours) }
+                    .focused($focusedPicker, equals: .hours)
                     
-                    VStack(spacing: 2) {
-                        Picker("Minutes", selection: $minutes) {
-                            ForEach(minuteStepRange, id: \.self) { m in
-                                Text(String(format: "%02d", m))
-                                    .font(.system(size: pickerFontSize, weight: .semibold))
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        .pickerStyle(.wheel)
-                        .background(Color.black)
-                        .overlay(Color.clear)
-                        .disabled(isUnlimited)
-                        .frame(width: pickerWidth, height: pickerHeight)
-                        .clipped()
-                    }
-                    .background(Color.black)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    DurationWheelColumn(
+                        value: $minutes,
+                        options: minuteStepRange,
+                        format: { String(format: "%02d", $0) },
+                        pickerFontSize: pickerFontSize,
+                        width: pickerWidth,
+                        height: pickerHeight,
+                        accentColor: accentColor,
+                        isActive: highlightedPicker == .minutes
+                    )
+                    .onTapGesture { selectDurationPicker(.minutes) }
+                    .focused($focusedPicker, equals: .minutes)
                 }
                 .padding(.top, 8)
+                .disabled(isUnlimited)
                 
                 Button {
                     isUnlimited.toggle()
@@ -401,10 +478,26 @@ struct TimeDurationPicker: View {
                     isUnlimited = true
                 } else {
                     isUnlimited = false
-                    hours = totalMinutes / 60
+                    hours = min(3, totalMinutes / 60)
                     minutes = totalMinutes % 60
                     let remainder = minutes % 5
                     if remainder != 0 { minutes -= remainder }
+                }
+                if !isUnlimited {
+                    highlightedPicker = .hours
+                    focusedPicker = .hours
+                }
+            }
+            .onChange(of: focusedPicker) { _, newFocus in
+                guard let newFocus, !isUnlimited else { return }
+                highlightedPicker = newFocus
+            }
+            .onChange(of: isUnlimited) { _, unlimited in
+                if unlimited {
+                    focusedPicker = nil
+                } else {
+                    highlightedPicker = .hours
+                    focusedPicker = .hours
                 }
             }
             .onChange(of: hours) { _, _ in
@@ -413,6 +506,15 @@ struct TimeDurationPicker: View {
             .onChange(of: minutes) { _, _ in
                 if !isUnlimited { totalMinutes = hours * 60 + minutes }
             }
+        }
+    }
+    
+    private func selectDurationPicker(_ picker: FocusedDurationPicker) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            highlightedPicker = picker
+            focusedPicker = picker
         }
     }
 }
@@ -510,8 +612,11 @@ struct FootballSetupView: View {
                             )
                         default:
                             ZStack(alignment: .top) {
-                                TimeDurationPicker(totalMinutes: $selectedTime)
-                                    .padding(.top, 24)
+                                TimeDurationPicker(
+                                    totalMinutes: $selectedTime,
+                                    accentColor: themeColor
+                                )
+                                .padding(.top, 24)
                                 
                                 SetupButtonStackPlacement(
                                     headerBlockHeight: SetupScreenMetrics.headerBlockHeight
