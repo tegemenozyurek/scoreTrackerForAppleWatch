@@ -323,6 +323,10 @@ private struct DurationWheelColumn: View {
         options.firstIndex(of: value) ?? 0
     }
     
+    private var rowHeight: CGFloat {
+        height / 3
+    }
+    
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
         let borderColor = isActive ? accentColor : Color.white.opacity(0.28)
@@ -332,12 +336,15 @@ private struct DurationWheelColumn: View {
         ZStack {
             shape.fill(Color.black)
             
-            VStack(spacing: 1) {
+            VStack(spacing: 0) {
                 wheelRow(offset: -1, fontSize: secondaryFontSize)
+                    .frame(height: rowHeight)
                 wheelRow(offset: 0, fontSize: pickerFontSize, isCenter: true)
+                    .frame(height: rowHeight)
                 wheelRow(offset: 1, fontSize: secondaryFontSize)
+                    .frame(height: rowHeight)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(width: width, height: height)
             
             shape.stroke(
                 borderColor,
@@ -346,6 +353,8 @@ private struct DurationWheelColumn: View {
         }
         .frame(width: width, height: height)
         .contentShape(shape)
+        .animation(nil, value: value)
+        .animation(nil, value: isActive)
         .focusable()
         .digitalCrownRotation(
             $crownIndex,
@@ -365,7 +374,11 @@ private struct DurationWheelColumn: View {
         .onChange(of: crownIndex) { _, newIndex in
             let idx = min(options.count - 1, max(0, Int(newIndex.rounded())))
             guard options.indices.contains(idx) else { return }
-            value = options[idx]
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                value = options[idx]
+            }
         }
     }
     
@@ -375,12 +388,17 @@ private struct DurationWheelColumn: View {
         if options.indices.contains(idx) {
             Text(format(options[idx]))
                 .font(.system(size: fontSize, weight: isCenter ? .semibold : .regular))
+                .monospacedDigit()
                 .foregroundColor(isCenter ? .white : .white.opacity(0.35))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .contentTransition(.identity)
         } else {
-            Text(" ")
+            Text("00")
                 .font(.system(size: fontSize))
+                .monospacedDigit()
+                .opacity(0)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }
