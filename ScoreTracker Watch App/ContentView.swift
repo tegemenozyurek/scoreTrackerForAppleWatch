@@ -572,8 +572,12 @@ private struct MatchSession: Identifiable {
     let id = UUID()
     let team1Color: Color
     let team2Color: Color
+    let sportName: String
+    let sportIcon: String
     let initialTimerSeconds: Int
     let countsUp: Bool
+    
+    var isBasketball: Bool { sportName == "Basketball" }
 }
 
 struct FootballSetupView: View {
@@ -581,14 +585,30 @@ struct FootballSetupView: View {
     var onDismissToSportList: (() -> Void)? = nil
     @State private var team1ColorIndex = TeamColor.red.rawValue
     @State private var team2ColorIndex = TeamColor.blue.rawValue
-    @State private var selectedTime = 60
-    @State private var hasTimeLimit = true
+    @State private var selectedTime: Int
+    @State private var hasTimeLimit: Bool
     @State private var currentStep = 0 // 0: Team 1, 1: Team 2, 2: Time
     @State private var activeMatch: MatchSession?
     @State private var dismissToMain = false
     @State private var isStartPulsing = false
     let themeColor: Color
+    let sportName: String
     let sportIcon: String
+    
+    init(
+        onDismissToSportList: (() -> Void)? = nil,
+        themeColor: Color,
+        sportName: String,
+        sportIcon: String,
+        defaultHasTimeLimit: Bool = true
+    ) {
+        self.onDismissToSportList = onDismissToSportList
+        self.themeColor = themeColor
+        self.sportName = sportName
+        self.sportIcon = sportIcon
+        _hasTimeLimit = State(initialValue: defaultHasTimeLimit)
+        _selectedTime = State(initialValue: defaultHasTimeLimit ? 60 : 0)
+    }
     
     private var allColorIndices: [Int] {
         TeamColor.allCases.map(\.rawValue)
@@ -631,6 +651,8 @@ struct FootballSetupView: View {
         activeMatch = MatchSession(
             team1Color: selectedTeam1Color,
             team2Color: selectedTeam2Color,
+            sportName: sportName,
+            sportIcon: sportIcon,
             initialTimerSeconds: timerSeconds,
             countsUp: !hasTimeLimit
         )
@@ -751,6 +773,8 @@ struct FootballSetupView: View {
             ScoreboardView(
                 team1Color: session.team1Color,
                 team2Color: session.team2Color,
+                sportName: session.sportName,
+                sportIcon: session.sportIcon,
                 initialTimerSeconds: session.initialTimerSeconds,
                 countsUp: session.countsUp,
                 dismissToMain: $dismissToMain
@@ -815,9 +839,209 @@ private struct MatchScoreLabel: View {
     }
 }
 
+private struct BasketballPointButton: View {
+    let points: Int
+    let color: Color
+    let width: CGFloat
+    let height: CGFloat
+    let fontSize: CGFloat
+    let isEnabled: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text("+\(points)")
+                .font(.system(size: fontSize, weight: .bold))
+                .foregroundColor(.white)
+                .frame(width: width, height: height)
+                .background(color)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.45)
+    }
+}
+
+private struct BasketballScoreboardRow: View {
+    let team1Color: Color
+    let team2Color: Color
+    let sportIcon: String
+    let team1Score: Int
+    let team2Score: Int
+    let timeString: String
+    let team1Spin: Double
+    let team2Spin: Double
+    let isScoringEnabled: Bool
+    let onAddPointsTeam1: (Int) -> Void
+    let onAddPointsTeam2: (Int) -> Void
+    let onDecrementTeam1: () -> Void
+    let onDecrementTeam2: () -> Void
+    
+    var body: some View {
+        GeometryReader { geo in
+            let screenWidth = geo.size.width
+            let buttonGap: CGFloat = 5
+            let topRowGaps = buttonGap * 3
+            let quarterWidth = (screenWidth - topRowGaps) / 4
+            let halfWidth = (screenWidth - buttonGap) / 2
+            let buttonHeight = min(34, quarterWidth)
+            let buttonFontSize: CGFloat = buttonHeight >= 30 ? 14 : 12
+            let buttonRowSpacing: CGFloat = 6
+            let teamGap: CGFloat = 6
+            let dashWidth: CGFloat = 10
+            let scoreColumnWidth: CGFloat = 30
+            let ballSide = min(46, max(36, screenWidth * 0.18))
+            let maxScore = max(team1Score, team2Score)
+            let scoreFontSize = scoreFontSize(for: maxScore, columnWidth: scoreColumnWidth)
+            let dashFontSize = max(16, scoreFontSize * 0.75)
+            let timerHeight: CGFloat = 18
+            let contentHeight = ballSide + timerHeight + 6 + buttonHeight * 2 + buttonRowSpacing
+            
+            VStack(spacing: 6) {
+                HStack(alignment: .top, spacing: teamGap) {
+                    TeamScoreBall(
+                        color: team1Color,
+                        sportIcon: sportIcon,
+                        spinDegrees: team1Spin,
+                        side: ballSide,
+                        allowsTapIncrement: false,
+                        onIncrement: {},
+                        onDecrement: onDecrementTeam1
+                    )
+                    
+                    VStack(spacing: 3) {
+                        HStack(spacing: 2) {
+                            MatchScoreLabel(
+                                score: team1Score,
+                                columnWidth: scoreColumnWidth,
+                                fontSize: scoreFontSize,
+                                onGoal: {},
+                                onDecrement: onDecrementTeam1
+                            )
+                            
+                            Text("-")
+                                .font(.system(size: dashFontSize, weight: .medium))
+                                .foregroundColor(.white.opacity(0.5))
+                                .frame(width: dashWidth)
+                                .lineLimit(1)
+                            
+                            MatchScoreLabel(
+                                score: team2Score,
+                                columnWidth: scoreColumnWidth,
+                                fontSize: scoreFontSize,
+                                onGoal: {},
+                                onDecrement: onDecrementTeam2
+                            )
+                        }
+                        .fixedSize(horizontal: true, vertical: false)
+                        
+                        Text(timeString)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.85))
+                            .monospacedDigit()
+                    }
+                    
+                    TeamScoreBall(
+                        color: team2Color,
+                        sportIcon: sportIcon,
+                        spinDegrees: team2Spin,
+                        side: ballSide,
+                        allowsTapIncrement: false,
+                        onIncrement: {},
+                        onDecrement: onDecrementTeam2
+                    )
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                
+                VStack(spacing: buttonRowSpacing) {
+                    HStack(spacing: buttonGap) {
+                        BasketballPointButton(
+                            points: 1,
+                            color: team1Color,
+                            width: quarterWidth,
+                            height: buttonHeight,
+                            fontSize: buttonFontSize,
+                            isEnabled: isScoringEnabled,
+                            action: { onAddPointsTeam1(1) }
+                        )
+                        
+                        BasketballPointButton(
+                            points: 2,
+                            color: team1Color,
+                            width: quarterWidth,
+                            height: buttonHeight,
+                            fontSize: buttonFontSize,
+                            isEnabled: isScoringEnabled,
+                            action: { onAddPointsTeam1(2) }
+                        )
+                        
+                        BasketballPointButton(
+                            points: 1,
+                            color: team2Color,
+                            width: quarterWidth,
+                            height: buttonHeight,
+                            fontSize: buttonFontSize,
+                            isEnabled: isScoringEnabled,
+                            action: { onAddPointsTeam2(1) }
+                        )
+                        
+                        BasketballPointButton(
+                            points: 2,
+                            color: team2Color,
+                            width: quarterWidth,
+                            height: buttonHeight,
+                            fontSize: buttonFontSize,
+                            isEnabled: isScoringEnabled,
+                            action: { onAddPointsTeam2(2) }
+                        )
+                    }
+                    
+                    HStack(spacing: buttonGap) {
+                        BasketballPointButton(
+                            points: 3,
+                            color: team1Color,
+                            width: halfWidth,
+                            height: buttonHeight,
+                            fontSize: buttonFontSize,
+                            isEnabled: isScoringEnabled,
+                            action: { onAddPointsTeam1(3) }
+                        )
+                        
+                        BasketballPointButton(
+                            points: 3,
+                            color: team2Color,
+                            width: halfWidth,
+                            height: buttonHeight,
+                            fontSize: buttonFontSize,
+                            isEnabled: isScoringEnabled,
+                            action: { onAddPointsTeam2(3) }
+                        )
+                    }
+                }
+                .frame(width: screenWidth)
+            }
+            .frame(width: screenWidth, height: contentHeight, alignment: .top)
+            .padding(.top, 2)
+        }
+        .frame(height: 138)
+    }
+    
+    private func scoreFontSize(for score: Int, columnWidth: CGFloat) -> CGFloat {
+        let digits = max(1, String(score).count)
+        let base: CGFloat = switch digits {
+        case 1: min(42, columnWidth * 1.4)
+        case 2: min(36, columnWidth * 1.15)
+        default: min(28, columnWidth * 0.95)
+        }
+        return max(20, base)
+    }
+}
+
 private struct ScoreboardScoreRow: View {
     let team1Color: Color
     let team2Color: Color
+    let sportIcon: String
     let team1Score: Int
     let team2Score: Int
     let team1Spin: Double
@@ -844,6 +1068,7 @@ private struct ScoreboardScoreRow: View {
             HStack(spacing: horizontalSpacing) {
                 TeamScoreBall(
                     color: team1Color,
+                    sportIcon: sportIcon,
                     spinDegrees: team1Spin,
                     side: ballSide,
                     onIncrement: onGoalTeam1,
@@ -878,6 +1103,7 @@ private struct ScoreboardScoreRow: View {
                 
                 TeamScoreBall(
                     color: team2Color,
+                    sportIcon: sportIcon,
                     spinDegrees: team2Spin,
                     side: ballSide,
                     onIncrement: onGoalTeam2,
@@ -902,13 +1128,15 @@ private struct ScoreboardScoreRow: View {
 
 private struct TeamScoreBall: View {
     let color: Color
+    let sportIcon: String
     let spinDegrees: Double
     var side: CGFloat = 48
+    var allowsTapIncrement: Bool = true
     let onIncrement: () -> Void
     let onDecrement: () -> Void
     
     var body: some View {
-        Image(systemName: "soccerball")
+        Image(systemName: sportIcon)
             .font(.system(size: side * 0.92, weight: .medium))
             .foregroundStyle(color)
             .symbolRenderingMode(.monochrome)
@@ -916,7 +1144,9 @@ private struct TeamScoreBall: View {
             .animation(.easeInOut(duration: TeamScoreBall.spinDuration), value: spinDegrees)
             .frame(width: side, height: side)
             .contentShape(Rectangle())
-            .onTapGesture(perform: onIncrement)
+            .onTapGesture {
+                if allowsTapIncrement { onIncrement() }
+            }
             .gesture(
                 DragGesture().onEnded { value in
                     if abs(value.translation.height) > 20 {
@@ -941,9 +1171,13 @@ struct ScoreboardView: View {
     @Environment(\.dismiss) private var dismiss
     let team1Color: Color
     let team2Color: Color
+    let sportName: String
+    let sportIcon: String
     let initialTimerSeconds: Int
     let countsUp: Bool
     @Binding var dismissToMain: Bool
+    
+    private var isBasketball: Bool { sportName == "Basketball" }
     
     @State private var team1Score = 0
     @State private var team2Score = 0
@@ -958,12 +1192,16 @@ struct ScoreboardView: View {
     init(
         team1Color: Color,
         team2Color: Color,
+        sportName: String,
+        sportIcon: String,
         initialTimerSeconds: Int,
         countsUp: Bool,
         dismissToMain: Binding<Bool>
     ) {
         self.team1Color = team1Color
         self.team2Color = team2Color
+        self.sportName = sportName
+        self.sportIcon = sportIcon
         self.initialTimerSeconds = initialTimerSeconds
         self.countsUp = countsUp
         self._dismissToMain = dismissToMain
@@ -976,52 +1214,77 @@ struct ScoreboardView: View {
                 Color.black
                     .ignoresSafeArea()
                 
-                VStack(spacing: 0) {
-                    // Heart rate display (moved to top)
-                    VStack(spacing: 4) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "heart.fill")
-                                .foregroundColor(.red)
-                                .font(.system(size: 16))
-                            
-                            Text("--")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundColor(.white)
-                            
-                            Text("BPM")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white.opacity(0.7))
+                ZStack(alignment: .bottom) {
+                    VStack(spacing: 0) {
+                        VStack(spacing: 4) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "heart.fill")
+                                    .foregroundColor(.red)
+                                    .font(.system(size: 16))
+                                
+                                Text("--")
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundColor(.white)
+                                
+                                Text("BPM")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.7))
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(Capsule())
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.white.opacity(0.1))
-                        .clipShape(Capsule())
+                        .padding(.top, -60)
+                        
+                        Group {
+                            if isBasketball {
+                                BasketballScoreboardRow(
+                                    team1Color: team1Color,
+                                    team2Color: team2Color,
+                                    sportIcon: sportIcon,
+                                    team1Score: team1Score,
+                                    team2Score: team2Score,
+                                    timeString: timeString,
+                                    team1Spin: team1Spin,
+                                    team2Spin: team2Spin,
+                                    isScoringEnabled: !isScoreIncreaseLocked,
+                                    onAddPointsTeam1: { scorePoints(for: 1, points: $0) },
+                                    onAddPointsTeam2: { scorePoints(for: 2, points: $0) },
+                                    onDecrementTeam1: { adjustTeam1Score(by: -1) },
+                                    onDecrementTeam2: { adjustTeam2Score(by: -1) }
+                                )
+                            } else {
+                                ScoreboardScoreRow(
+                                    team1Color: team1Color,
+                                    team2Color: team2Color,
+                                    sportIcon: sportIcon,
+                                    team1Score: team1Score,
+                                    team2Score: team2Score,
+                                    team1Spin: team1Spin,
+                                    team2Spin: team2Spin,
+                                    onGoalTeam1: { scorePoints(for: 1, points: 1) },
+                                    onGoalTeam2: { scorePoints(for: 2, points: 1) },
+                                    onDecrementTeam1: { adjustTeam1Score(by: -1) },
+                                    onDecrementTeam2: { adjustTeam2Score(by: -1) }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 2)
+                        .padding(.top, isBasketball ? 0 : 10)
+                        .offset(y: isBasketball ? -12 : 2)
+                        .overlay(alignment: .bottom) {
+                            if !isBasketball {
+                                Text(timeString)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.85))
+                                    .offset(y: 26)
+                            }
+                        }
+                        
+                        Spacer(minLength: 0)
                     }
-                    .padding(.top, -60)
-                    
-                    ScoreboardScoreRow(
-                        team1Color: team1Color,
-                        team2Color: team2Color,
-                        team1Score: team1Score,
-                        team2Score: team2Score,
-                        team1Spin: team1Spin,
-                        team2Spin: team2Spin,
-                        onGoalTeam1: { scoreGoal(for: 1) },
-                        onGoalTeam2: { scoreGoal(for: 2) },
-                        onDecrementTeam1: { adjustTeam1Score(by: -1) },
-                        onDecrementTeam2: { adjustTeam2Score(by: -1) }
-                    )
-                    .padding(.horizontal, 2)
-                    .padding(.top, 10)
-                    .offset(y: 2)
-                    .overlay(alignment: .bottom) {
-                        Text(timeString)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.85))
-                            .offset(y: 26)
-                    }
-                    
-                    Spacer(minLength: 0)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     
                     HStack(spacing: 8) {
                         MatchControlButton(
@@ -1064,7 +1327,7 @@ struct ScoreboardView: View {
                     .padding(.bottom, 0)
                     .offset(y: 28)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .onReceive(timer) { _ in
@@ -1091,19 +1354,20 @@ struct ScoreboardView: View {
         scoreHistory.append(ScoreSnapshot(team1: team1Score, team2: team2Score))
     }
     
-    private func scoreGoal(for team: Int) {
+    private func scorePoints(for team: Int, points: Int) {
         guard !isScoreIncreaseLocked else { return }
+        guard points > 0 else { return }
         isScoreIncreaseLocked = true
         
         pushScoreHistory()
         switch team {
         case 1:
-            team1Score += 1
+            team1Score += points
             withAnimation(.easeInOut(duration: TeamScoreBall.spinDuration)) {
                 team1Spin += 360
             }
         case 2:
-            team2Score += 1
+            team2Score += points
             withAnimation(.easeInOut(duration: TeamScoreBall.spinDuration)) {
                 team2Spin += 360
             }
@@ -1255,6 +1519,7 @@ struct ContentView: View {
     @State private var isSelectingSport = false
     @State private var setupThemeColor: Color = Color(hex: "#228B22")
     @State private var setupSportIcon: String = "soccerball"
+    @State private var setupSportName: String = "Football"
     
     var body: some View {
         ZStack {
@@ -1299,7 +1564,9 @@ struct ContentView: View {
                 FootballSetupView(
                     onDismissToSportList: exitSetup,
                     themeColor: setupThemeColor,
-                    sportIcon: setupSportIcon
+                    sportName: setupSportName,
+                    sportIcon: setupSportIcon,
+                    defaultHasTimeLimit: setupSportName != "Basketball"
                 )
                 .opacity(setupCoverOpacity)
             }
@@ -1310,6 +1577,7 @@ struct ContentView: View {
     private func beginSetup(for sport: Sport) {
         setupThemeColor = sport.color
         setupSportIcon = sport.icon
+        setupSportName = sport.name
         isSelectingSport = false
         setupCoverOpacity = 1
         showingSetup = true
