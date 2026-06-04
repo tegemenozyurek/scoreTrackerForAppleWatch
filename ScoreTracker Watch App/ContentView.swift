@@ -1236,6 +1236,42 @@ private struct ScoreboardScoreRow: View {
     }
 }
 
+private struct TennisStatValueLabel: View {
+    let value: Int
+    let accentColor: Color
+    let columnWidth: CGFloat
+    
+    @State private var scale: CGFloat = 1
+    
+    var body: some View {
+        Text("\(value)")
+            .font(.system(size: 15, weight: .bold))
+            .foregroundColor(accentColor)
+            .monospacedDigit()
+            .scaleEffect(scale)
+            .frame(width: columnWidth)
+            .onChange(of: value) { _, _ in
+                pulseScale()
+            }
+    }
+    
+    private func pulseScale() {
+        withAnimation(.easeOut(duration: 0.2)) {
+            scale = 1.85
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            withAnimation(.easeIn(duration: 0.12)) {
+                scale = 0.82
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.45)) {
+                    scale = 1
+                }
+            }
+        }
+    }
+}
+
 private struct TennisPlayerScoreRow: View {
     let accentColor: Color
     let sportIcon: String
@@ -1251,47 +1287,48 @@ private struct TennisPlayerScoreRow: View {
     private let pointFontSize: CGFloat = 26
     
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 0) {
-                Image(systemName: sportIcon)
-                    .font(.system(size: 34, weight: .medium))
-                    .foregroundStyle(accentColor)
-                    .symbolRenderingMode(.monochrome)
-                    .rotationEffect(.degrees(spinDegrees))
-                    .animation(.easeInOut(duration: TeamScoreBall.spinDuration), value: spinDegrees)
-                    .frame(width: iconColumnWidth)
-                
-                columnDivider
-                
-                Text("\(sets)")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(accentColor)
-                    .monospacedDigit()
-                    .frame(width: statColumnWidth)
-                
-                columnDivider
-                
-                Text("\(games)")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(accentColor)
-                    .monospacedDigit()
-                    .frame(width: statColumnWidth)
-                
-                columnDivider
-                
-                Text(pointDisplay)
-                    .font(.system(size: pointFontSize, weight: .bold))
-                    .foregroundColor(accentColor)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .frame(maxWidth: .infinity, alignment: .center)
-            }
-            .padding(.vertical, 9)
-            .padding(.horizontal, 8)
+        HStack(spacing: 0) {
+            Image(systemName: sportIcon)
+                .font(.system(size: 34, weight: .medium))
+                .foregroundStyle(accentColor)
+                .symbolRenderingMode(.monochrome)
+                .rotationEffect(.degrees(spinDegrees))
+                .animation(.easeInOut(duration: TeamScoreBall.spinDuration), value: spinDegrees)
+                .frame(width: iconColumnWidth)
+            
+            columnDivider
+            
+            TennisStatValueLabel(
+                value: sets,
+                accentColor: accentColor,
+                columnWidth: statColumnWidth
+            )
+            
+            columnDivider
+            
+            TennisStatValueLabel(
+                value: games,
+                accentColor: accentColor,
+                columnWidth: statColumnWidth
+            )
+            
+            columnDivider
+            
+            Text(pointDisplay)
+                .font(.system(size: pointFontSize, weight: .bold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(maxWidth: .infinity, alignment: .center)
         }
-        .buttonStyle(PlainButtonStyle())
-        .disabled(!isScoringEnabled)
-        .opacity(isScoringEnabled ? 1 : 0.55)
+        .padding(.vertical, 9)
+        .padding(.horizontal, 8)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard isScoringEnabled else { return }
+            onTap()
+        }
+        .allowsHitTesting(isScoringEnabled)
     }
     
     private var columnDivider: some View {
