@@ -62,6 +62,29 @@ private struct MatchBPMHeaderView: View {
     }
 }
 
+private struct MatchTopHeaderView: View {
+    let timeString: String?
+    
+    var body: some View {
+        ZStack {
+            MatchBPMHeaderView()
+            
+            if let timeString {
+                HStack {
+                    Text(timeString)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.85))
+                        .monospacedDigit()
+                        .padding(.leading, 10)
+                    Spacer(minLength: 0)
+                }
+                .frame(height: MatchScreenMetrics.bpmBandHeight)
+            }
+        }
+        .frame(height: MatchScreenMetrics.bpmBandHeight)
+    }
+}
+
 struct SetupActionButtons: View {
     let primaryTitle: String
     let primaryAction: () -> Void
@@ -869,6 +892,11 @@ private struct ScoreSnapshot: Equatable {
     let team2: Int
 }
 
+private enum TennisServeSide: String, Equatable {
+    case left = "LEFT"
+    case right = "RIGHT"
+}
+
 private struct TennisMatchState: Equatable {
     var point1: Int = 0
     var point2: Int = 0
@@ -876,6 +904,10 @@ private struct TennisMatchState: Equatable {
     var game2: Int = 0
     var set1: Int = 0
     var set2: Int = 0
+    var servingPlayer: Int = 1
+    var serveSide: TennisServeSide = .right
+    /// Server for tiebreak point 1 when at 6–6; nil outside tiebreak.
+    var tiebreakFirstServer: Int? = nil
     
     private static let pointLabels = ["0", "15", "30", "40"]
     
@@ -892,6 +924,9 @@ private struct TennisMatchState: Equatable {
     
     mutating func awardPoint(to team: Int) {
         guard team == 1 || team == 2 else { return }
+        let serverAtStart = servingPlayer
+        let gamesBefore = (game1, game2)
+        
         var p1 = point1
         var p2 = point2
         var g1 = game1
@@ -925,6 +960,41 @@ private struct TennisMatchState: Equatable {
         game2 = g2
         set1 = s1
         set2 = s2
+        
+        let gameWon = game1 != gamesBefore.0 || game2 != gamesBefore.1
+        advanceServe(gameWon: gameWon, serverAtPointStart: serverAtStart)
+    }
+    
+    private mutating func advanceServe(gameWon: Bool, serverAtPointStart: Int) {
+        if gameWon {
+            servingPlayer = serverAtPointStart == 1 ? 2 : 1
+            serveSide = .right
+            if game1 == 6 && game2 == 6 {
+                tiebreakFirstServer = servingPlayer
+            } else {
+                tiebreakFirstServer = nil
+            }
+            return
+        }
+        
+        if game1 == 6 && game2 == 6 {
+            if tiebreakFirstServer == nil {
+                tiebreakFirstServer = servingPlayer
+            }
+            applyTiebreakServeRotation()
+        } else {
+            tiebreakFirstServer = nil
+            serveSide = serveSide == .left ? .right : .left
+        }
+    }
+    
+    /// Tiebreak: first server one point, then alternate every two points; side alternates each point.
+    private mutating func applyTiebreakServeRotation() {
+        guard let first = tiebreakFirstServer else { return }
+        let pointsPlayed = point1 + point2
+        let serveBlock = max(0, (pointsPlayed - 1) / 2)
+        servingPlayer = (serveBlock % 2 == 0) ? first : (3 - first)
+        serveSide = (pointsPlayed % 2 == 1) ? .right : .left
     }
     
     private static func applyPoint(
@@ -1386,6 +1456,25 @@ private struct TennisPlayerScoreRow: View {
     }
 }
 
+private struct TennisServeIndicator: View {
+    let servingPlayer: Int
+    let serveSide: TennisServeSide
+    let team1Color: Color
+    let team2Color: Color
+    
+    private var serverColor: Color {
+        servingPlayer == 1 ? team1Color : team2Color
+    }
+    
+    var body: some View {
+        Text(serveSide.rawValue)
+            .font(.system(size: 12, weight: .bold))
+            .foregroundColor(serverColor)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 8)
+    }
+}
+
 private struct TennisScoreboardRow: View {
     let team1Color: Color
     let team2Color: Color
@@ -1399,41 +1488,51 @@ private struct TennisScoreboardRow: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            TennisPlayerScoreRow(
-                accentColor: team1Color,
-                sportIcon: sportIcon,
-                spinDegrees: team1Spin,
-                sets: tennisState.set1,
-                games: tennisState.game1,
-                pointDisplay: tennisState.pointDisplay(forTeam: 1),
-                isScoringEnabled: isScoringEnabled,
-                onTap: onPointTeam1
-            )
-            
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [team1Color.opacity(0.55), team2Color.opacity(0.55)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
+            VStack(spacing: 0) {
+                TennisPlayerScoreRow(
+                    accentColor: team1Color,
+                    sportIcon: sportIcon,
+                    spinDegrees: team1Spin,
+                    sets: tennisState.set1,
+                    games: tennisState.game1,
+                    pointDisplay: tennisState.pointDisplay(forTeam: 1),
+                    isScoringEnabled: isScoringEnabled,
+                    onTap: onPointTeam1
                 )
-                .frame(height: 1)
+                
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [team1Color.opacity(0.55), team2Color.opacity(0.55)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(height: 1)
+                
+                TennisPlayerScoreRow(
+                    accentColor: team2Color,
+                    sportIcon: sportIcon,
+                    spinDegrees: team2Spin,
+                    sets: tennisState.set2,
+                    games: tennisState.game2,
+                    pointDisplay: tennisState.pointDisplay(forTeam: 2),
+                    isScoringEnabled: isScoringEnabled,
+                    onTap: onPointTeam2
+                )
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 4)
+            .frame(height: 102)
             
-            TennisPlayerScoreRow(
-                accentColor: team2Color,
-                sportIcon: sportIcon,
-                spinDegrees: team2Spin,
-                sets: tennisState.set2,
-                games: tennisState.game2,
-                pointDisplay: tennisState.pointDisplay(forTeam: 2),
-                isScoringEnabled: isScoringEnabled,
-                onTap: onPointTeam2
+            TennisServeIndicator(
+                servingPlayer: tennisState.servingPlayer,
+                serveSide: tennisState.serveSide,
+                team1Color: team1Color,
+                team2Color: team2Color
             )
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 4)
-        .frame(height: 102)
     }
 }
 
@@ -1694,7 +1793,7 @@ struct ScoreboardView: View {
                 ZStack(alignment: .bottom) {
                     VStack(spacing: 0) {
                         VStack(spacing: 4) {
-                            MatchBPMHeaderView()
+                            MatchTopHeaderView(timeString: isTennis ? timeString : nil)
                         }
                         .padding(.top, -60)
                         
@@ -1747,7 +1846,7 @@ struct ScoreboardView: View {
                         .padding(.top, isBasketball ? 0 : (isTennis ? 0 : 10))
                         .offset(y: isBasketball ? -12 : (isTennis ? -16 : 2))
                         .overlay(alignment: .bottom) {
-                            if !isBasketball {
+                            if !isBasketball && !isTennis {
                                 Text(timeString)
                                     .font(.system(size: 15, weight: .semibold))
                                     .foregroundColor(.white.opacity(0.85))
