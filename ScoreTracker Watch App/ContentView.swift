@@ -131,6 +131,7 @@ struct PickColorWheelHint: View {
 
 struct TeamColorWheelSelectionView: View {
     let teamNumber: Int
+    var usesPlayerLabel: Bool = false
     let sportIcon: String
     @Binding var colorIndex: Int
     let availableColorIndices: [Int]
@@ -174,7 +175,7 @@ struct TeamColorWheelSelectionView: View {
                 
                 VStack(spacing: 0) {
                     VStack(spacing: 8) {
-                        Text("Team #\(teamNumber)")
+                        Text("\(usesPlayerLabel ? "Player" : "Team") #\(teamNumber)")
                             .font(.system(size: 22, weight: .bold))
                             .foregroundColor(.white)
                             .multilineTextAlignment(.center)
@@ -686,6 +687,7 @@ struct FootballSetupView: View {
                         case 0:
                             TeamColorWheelSelectionView(
                                 teamNumber: 1,
+                                usesPlayerLabel: sportName == "Tennis",
                                 sportIcon: sportIcon,
                                 colorIndex: $team1ColorIndex,
                                 availableColorIndices: allColorIndices,
@@ -695,6 +697,7 @@ struct FootballSetupView: View {
                         case 1:
                             TeamColorWheelSelectionView(
                                 teamNumber: 2,
+                                usesPlayerLabel: sportName == "Tennis",
                                 sportIcon: sportIcon,
                                 colorIndex: $team2ColorIndex,
                                 availableColorIndices: team2ColorIndices,
