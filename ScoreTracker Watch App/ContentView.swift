@@ -1362,7 +1362,7 @@ private struct TennisStatValueLabel: View {
     
     var body: some View {
         Text("\(value)")
-            .font(.system(size: 15, weight: .bold))
+            .font(.system(size: 19, weight: .bold))
             .foregroundColor(accentColor)
             .monospacedDigit()
             .scaleEffect(scale)
@@ -1399,14 +1399,14 @@ private struct TennisPlayerScoreRow: View {
     let isScoringEnabled: Bool
     let onTap: () -> Void
     
-    private let iconColumnWidth: CGFloat = 52
-    private let statColumnWidth: CGFloat = 32
-    private let pointFontSize: CGFloat = 26
+    private let iconColumnWidth: CGFloat = 58
+    private let statColumnWidth: CGFloat = 36
+    private let pointFontSize: CGFloat = 30
     
     var body: some View {
         HStack(spacing: 0) {
             Image(systemName: sportIcon)
-                .font(.system(size: 34, weight: .medium))
+                .font(.system(size: 38, weight: .medium))
                 .foregroundStyle(accentColor)
                 .symbolRenderingMode(.monochrome)
                 .rotationEffect(.degrees(spinDegrees))
@@ -1438,8 +1438,8 @@ private struct TennisPlayerScoreRow: View {
                 .minimumScaleFactor(0.75)
                 .frame(maxWidth: .infinity, alignment: .center)
         }
-        .padding(.vertical, 9)
-        .padding(.horizontal, 8)
+        .padding(.vertical, 11)
+        .padding(.horizontal, 10)
         .contentShape(Rectangle())
         .onTapGesture {
             guard isScoringEnabled else { return }
@@ -1452,7 +1452,7 @@ private struct TennisPlayerScoreRow: View {
         Rectangle()
             .fill(accentColor.opacity(0.28))
             .frame(width: 1)
-            .padding(.vertical, 5)
+            .padding(.vertical, 6)
     }
 }
 
@@ -1468,10 +1468,10 @@ private struct TennisServeIndicator: View {
     
     var body: some View {
         Text(serveSide.rawValue)
-            .font(.system(size: 12, weight: .bold))
+            .font(.system(size: 16, weight: .bold))
             .foregroundColor(serverColor)
             .frame(maxWidth: .infinity)
-            .padding(.top, 8)
+            .padding(.top, 10)
     }
 }
 
@@ -1523,7 +1523,7 @@ private struct TennisScoreboardRow: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 4)
-            .frame(height: 102)
+            .frame(height: 118)
             
             TennisServeIndicator(
                 servingPlayer: tennisState.servingPlayer,
@@ -1844,7 +1844,7 @@ struct ScoreboardView: View {
                         }
                         .padding(.horizontal, 2)
                         .padding(.top, isBasketball ? 0 : (isTennis ? 0 : 10))
-                        .offset(y: isBasketball ? -12 : (isTennis ? -16 : 2))
+                        .offset(y: isBasketball ? -12 : (isTennis ? -18 : 2))
                         .overlay(alignment: .bottom) {
                             if !isBasketball && !isTennis {
                                 Text(timeString)
