@@ -34,6 +34,34 @@ private enum SetupScreenMetrics {
     static let headerBlockHeight: CGFloat = 80
 }
 
+private enum MatchScreenMetrics {
+    /// Fixed BPM band height (pre-shrink layout) so scoreboards stay put when visuals scale down.
+    static let bpmBandHeight: CGFloat = 36
+}
+
+private struct MatchBPMHeaderView: View {
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "heart.fill")
+                .foregroundColor(.red)
+                .font(.system(size: 13))
+            
+            Text("--")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white)
+            
+            Text("BPM")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(.white.opacity(0.7))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(Color.white.opacity(0.1))
+        .clipShape(Capsule())
+        .frame(height: MatchScreenMetrics.bpmBandHeight)
+    }
+}
+
 struct SetupActionButtons: View {
     let primaryTitle: String
     let primaryAction: () -> Void
@@ -1650,23 +1678,7 @@ struct ScoreboardView: View {
                 ZStack(alignment: .bottom) {
                     VStack(spacing: 0) {
                         VStack(spacing: 4) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "heart.fill")
-                                    .foregroundColor(.red)
-                                    .font(.system(size: 16))
-                                
-                                Text("--")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundColor(.white)
-                                
-                                Text("BPM")
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.7))
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.white.opacity(0.1))
-                            .clipShape(Capsule())
+                            MatchBPMHeaderView()
                         }
                         .padding(.top, -60)
                         
