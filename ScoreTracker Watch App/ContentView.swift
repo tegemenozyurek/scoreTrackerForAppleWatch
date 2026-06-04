@@ -1167,6 +1167,164 @@ private func scoreDecrementDrag(perform onDecrement: @escaping () -> Void) -> so
     }
 }
 
+private struct ConfettiParticle: Identifiable {
+    let id = UUID()
+    let xRatio: CGFloat
+    let color: Color
+    let width: CGFloat
+    let height: CGFloat
+    let startRotation: Double
+    let endRotation: Double
+    let horizontalDrift: CGFloat
+    let fallDuration: Double
+    let delay: Double
+    
+    static func make(count: Int) -> [ConfettiParticle] {
+        let colors: [Color] = [.yellow, .orange, .pink, .blue, .green, .white, .purple, .mint]
+        return (0..<count).map { _ in
+            ConfettiParticle(
+                xRatio: CGFloat.random(in: 0.08...0.92),
+                color: colors.randomElement() ?? .yellow,
+                width: CGFloat.random(in: 4...7),
+                height: CGFloat.random(in: 6...11),
+                startRotation: Double.random(in: 0...180),
+                endRotation: Double.random(in: 180...540),
+                horizontalDrift: CGFloat.random(in: -18...18),
+                fallDuration: Double.random(in: 1.4...2.4),
+                delay: Double.random(in: 0...0.35)
+            )
+        }
+    }
+}
+
+private struct ConfettiPieceView: View {
+    let particle: ConfettiParticle
+    let containerSize: CGSize
+    @State private var hasFallen = false
+    
+    var body: some View {
+        RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+            .fill(particle.color)
+            .frame(width: particle.width, height: particle.height)
+            .rotationEffect(.degrees(hasFallen ? particle.endRotation : particle.startRotation))
+            .position(
+                x: particle.xRatio * containerSize.width + (hasFallen ? particle.horizontalDrift : 0),
+                y: hasFallen ? containerSize.height + 24 : -16
+            )
+            .opacity(hasFallen ? 0 : 1)
+            .onAppear {
+                withAnimation(.easeIn(duration: particle.fallDuration).delay(particle.delay)) {
+                    hasFallen = true
+                }
+            }
+    }
+}
+
+private struct MatchEndConfettiView: View {
+    @State private var particles: [ConfettiParticle] = []
+    
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                ForEach(particles) { particle in
+                    ConfettiPieceView(particle: particle, containerSize: geo.size)
+                }
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .onAppear {
+            particles = ConfettiParticle.make(count: 30)
+        }
+    }
+}
+
+private struct MatchStatsPlaceholderView: View {
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "heart.fill")
+                .font(.system(size: 22))
+                .foregroundColor(.red)
+            Text("Stats")
+                .font(.system(size: 16, weight: .semibold))
+            Text("Coming soon")
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+            Button("Close") { dismiss() }
+                .font(.system(size: 13, weight: .semibold))
+        }
+        .padding()
+    }
+}
+
+private struct MatchEndView: View {
+    let backgroundColor: Color
+    let resultMessage: String
+    let team1Score: Int
+    let team2Score: Int
+    let onFinish: () -> Void
+    let onStats: () -> Void
+    
+    var body: some View {
+        ZStack {
+            backgroundColor
+                .ignoresSafeArea()
+            
+            MatchEndConfettiView()
+            
+            VStack(spacing: 12) {
+                Text(resultMessage)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 12)
+                
+                Text("\(team1Score) - \(team2Score)")
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.85))
+                    .monospacedDigit()
+                
+                Spacer(minLength: 8)
+                
+                VStack(spacing: 6) {
+                    Button(action: onFinish) {
+                        Text("Finish")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.black)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 7)
+                            .background(Color.white)
+                            .cornerRadius(8)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    Button(action: onStats) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "heart.fill")
+                                .font(.system(size: 11, weight: .semibold))
+                            Text("Stats")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .background(Color.white.opacity(0.2))
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+                .padding(.horizontal, 28)
+                .offset(y: -18)
+            }
+            .padding(.top, 28)
+            .padding(.bottom, 8)
+            .offset(y: -22)
+        }
+    }
+}
+
 struct ScoreboardView: View {
     @Environment(\.dismiss) private var dismiss
     let team1Color: Color
@@ -1178,12 +1336,17 @@ struct ScoreboardView: View {
     @Binding var dismissToMain: Bool
     
     private var isBasketball: Bool { sportName == "Basketball" }
+    private var showsMatchEndScreen: Bool {
+        sportName == "Basketball" || sportName == "Football"
+    }
     
     @State private var team1Score = 0
     @State private var team2Score = 0
     @State private var timerSeconds: Int = 0
     @State private var isGameActive = true
     @State private var showingFinishAlert = false
+    @State private var showingMatchEnd = false
+    @State private var showingStats = false
     @State private var scoreHistory: [ScoreSnapshot] = []
     @State private var isScoreIncreaseLocked = false
     @State private var team1Spin: Double = 0
@@ -1312,8 +1475,8 @@ struct ScoreboardView: View {
                         MatchControlButton(
                             backgroundColor: .red,
                             accessibilityLabel: "Finish match",
-                            isEnabled: true,
-                            action: { showingFinishAlert = true }
+                            isEnabled: !showingMatchEnd,
+                            action: requestFinishFromWhistle
                         ) {
                             Image("Whistle")
                                 .renderingMode(.template)
@@ -1328,26 +1491,77 @@ struct ScoreboardView: View {
                     .offset(y: 28)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                
+                if showingMatchEnd {
+                    MatchEndView(
+                        backgroundColor: matchEndBackgroundColor,
+                        resultMessage: matchResultMessage,
+                        team1Score: team1Score,
+                        team2Score: team2Score,
+                        onFinish: exitToSportList,
+                        onStats: { showingStats = true }
+                    )
+                    .transition(.opacity)
+                }
             }
         }
         .onReceive(timer) { _ in
-            guard isGameActive else { return }
+            guard isGameActive, !showingMatchEnd else { return }
             if countsUp {
                 timerSeconds += 1
             } else if timerSeconds > 0 {
                 timerSeconds -= 1
+                if timerSeconds == 0 {
+                    presentMatchEnd()
+                }
             }
         }
-        .alert("Finish Match?", isPresented: $showingFinishAlert) {
+        .alert("End Match?", isPresented: $showingFinishAlert) {
             Button("Cancel", role: .cancel) { }
-            Button("Yes, Finish", role: .destructive) {
-                dismissToMain = true
-                dismiss()
+            Button("Finish", role: .destructive) {
+                presentMatchEnd()
             }
         } message: {
-            Text("Are you sure you want to finish the match?")
+            Text("Are you sure you want to end the match?")
+        }
+        .sheet(isPresented: $showingStats) {
+            MatchStatsPlaceholderView()
         }
         .navigationBarHidden(true)
+    }
+    
+    private var matchResultMessage: String {
+        if team1Score > team2Score { return "Team 1 wins" }
+        if team2Score > team1Score { return "Team 2 wins" }
+        return "Draw"
+    }
+    
+    private var matchEndBackgroundColor: Color {
+        if team1Score > team2Score { return team1Color }
+        if team2Score > team1Score { return team2Color }
+        return .gray
+    }
+    
+    private func requestFinishFromWhistle() {
+        guard !showingMatchEnd else { return }
+        showingFinishAlert = true
+    }
+    
+    private func presentMatchEnd() {
+        guard !showingMatchEnd else { return }
+        isGameActive = false
+        guard showsMatchEndScreen else {
+            exitToSportList()
+            return
+        }
+        withAnimation(.easeInOut(duration: 0.25)) {
+            showingMatchEnd = true
+        }
+    }
+    
+    private func exitToSportList() {
+        dismissToMain = true
+        dismiss()
     }
     
     private func pushScoreHistory() {
