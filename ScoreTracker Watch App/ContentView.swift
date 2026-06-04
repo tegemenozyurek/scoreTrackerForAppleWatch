@@ -1236,94 +1236,69 @@ private struct ScoreboardScoreRow: View {
     }
 }
 
-private struct TennisPointLabel: View {
-    let text: String
-    let columnWidth: CGFloat
-    let fontSize: CGFloat
+private struct TennisPlayerScoreRow: View {
+    let accentColor: Color
+    let sportIcon: String
+    let spinDegrees: Double
+    let sets: Int
+    let games: Int
+    let pointDisplay: String
+    let isScoringEnabled: Bool
+    let onTap: () -> Void
+    
+    private let iconColumnWidth: CGFloat = 52
+    private let statColumnWidth: CGFloat = 32
+    private let pointFontSize: CGFloat = 26
     
     var body: some View {
-        Text(text)
-            .font(.system(size: fontSize, weight: .bold))
-            .foregroundColor(.white)
-            .lineLimit(1)
-            .minimumScaleFactor(0.65)
-            .allowsTightening(true)
-            .frame(width: columnWidth, alignment: .center)
-    }
-}
-
-private struct TennisSetGameBar: View {
-    let set1: Int
-    let set2: Int
-    let game1: Int
-    let game2: Int
-    let team1Color: Color
-    let team2Color: Color
-    
-    var body: some View {
-        HStack(spacing: 0) {
-            statColumn(
-                title: "SETS",
-                leftScore: set1,
-                rightScore: set2,
-                leftColor: team1Color,
-                rightColor: team2Color
-            )
-            
-            Rectangle()
-                .fill(Color.white.opacity(0.2))
-                .frame(width: 1, height: 26)
-            
-            statColumn(
-                title: "GAMES",
-                leftScore: game1,
-                rightScore: game2,
-                leftColor: team1Color,
-                rightColor: team2Color
-            )
-        }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.white.opacity(0.1))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.white.opacity(0.14), lineWidth: 0.5)
-        )
-    }
-    
-    private func statColumn(
-        title: String,
-        leftScore: Int,
-        rightScore: Int,
-        leftColor: Color,
-        rightColor: Color
-    ) -> some View {
-        VStack(spacing: 3) {
-            Text(title)
-                .font(.system(size: 8, weight: .semibold))
-                .foregroundColor(.white.opacity(0.5))
-                .tracking(0.6)
-            
-            HStack(spacing: 5) {
-                Text("\(leftScore)")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(leftColor)
-                    .monospacedDigit()
+        Button(action: onTap) {
+            HStack(spacing: 0) {
+                Image(systemName: sportIcon)
+                    .font(.system(size: 34, weight: .medium))
+                    .foregroundStyle(accentColor)
+                    .symbolRenderingMode(.monochrome)
+                    .rotationEffect(.degrees(spinDegrees))
+                    .animation(.easeInOut(duration: TeamScoreBall.spinDuration), value: spinDegrees)
+                    .frame(width: iconColumnWidth)
                 
-                Text("–")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.35))
+                columnDivider
                 
-                Text("\(rightScore)")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(rightColor)
+                Text("\(sets)")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(accentColor)
                     .monospacedDigit()
+                    .frame(width: statColumnWidth)
+                
+                columnDivider
+                
+                Text("\(games)")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(accentColor)
+                    .monospacedDigit()
+                    .frame(width: statColumnWidth)
+                
+                columnDivider
+                
+                Text(pointDisplay)
+                    .font(.system(size: pointFontSize, weight: .bold))
+                    .foregroundColor(accentColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
+            .padding(.vertical, 9)
+            .padding(.horizontal, 8)
         }
-        .frame(maxWidth: .infinity)
+        .buttonStyle(PlainButtonStyle())
+        .disabled(!isScoringEnabled)
+        .opacity(isScoringEnabled ? 1 : 0.55)
+    }
+    
+    private var columnDivider: some View {
+        Rectangle()
+            .fill(accentColor.opacity(0.28))
+            .frame(width: 1)
+            .padding(.vertical, 5)
     }
 }
 
@@ -1339,76 +1314,42 @@ private struct TennisScoreboardRow: View {
     let onPointTeam2: () -> Void
     
     var body: some View {
-        GeometryReader { geo in
-            let horizontalSpacing: CGFloat = 4
-            let dashWidth: CGFloat = 12
-            let ballSide = min(46, max(34, geo.size.width * 0.21))
-            let scoreAreaWidth = max(
-                0,
-                geo.size.width - (ballSide * 2) - dashWidth - (horizontalSpacing * 4)
+        VStack(spacing: 0) {
+            TennisPlayerScoreRow(
+                accentColor: team1Color,
+                sportIcon: sportIcon,
+                spinDegrees: team1Spin,
+                sets: tennisState.set1,
+                games: tennisState.game1,
+                pointDisplay: tennisState.pointDisplay(forTeam: 1),
+                isScoringEnabled: isScoringEnabled,
+                onTap: onPointTeam1
             )
-            let scoreColumnWidth = max(26, scoreAreaWidth / 2)
-            let pointFontSize = min(32, max(20, scoreColumnWidth * 1.05))
-            let metaBarWidth = min(geo.size.width - 8, ballSide * 2 + scoreAreaWidth + dashWidth + 8)
             
-            VStack(spacing: 6) {
-                TennisSetGameBar(
-                    set1: tennisState.set1,
-                    set2: tennisState.set2,
-                    game1: tennisState.game1,
-                    game2: tennisState.game2,
-                    team1Color: team1Color,
-                    team2Color: team2Color
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [team1Color.opacity(0.55), team2Color.opacity(0.55)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
                 )
-                .frame(width: metaBarWidth)
-                
-                HStack(spacing: horizontalSpacing) {
-                    TeamScoreBall(
-                        color: team1Color,
-                        sportIcon: sportIcon,
-                        spinDegrees: team1Spin,
-                        side: ballSide,
-                        allowsTapIncrement: isScoringEnabled,
-                        onIncrement: onPointTeam1,
-                        onDecrement: {}
-                    )
-                    
-                    HStack(spacing: 2) {
-                        TennisPointLabel(
-                            text: tennisState.pointDisplay(forTeam: 1),
-                            columnWidth: scoreColumnWidth,
-                            fontSize: pointFontSize
-                        )
-                        
-                        Text("-")
-                            .font(.system(size: pointFontSize * 0.55, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-                            .frame(width: dashWidth)
-                            .lineLimit(1)
-                        
-                        TennisPointLabel(
-                            text: tennisState.pointDisplay(forTeam: 2),
-                            columnWidth: scoreColumnWidth,
-                            fontSize: pointFontSize
-                        )
-                    }
-                    .fixedSize(horizontal: true, vertical: false)
-                    .layoutPriority(1)
-                    
-                    TeamScoreBall(
-                        color: team2Color,
-                        sportIcon: sportIcon,
-                        spinDegrees: team2Spin,
-                        side: ballSide,
-                        allowsTapIncrement: isScoringEnabled,
-                        onIncrement: onPointTeam2,
-                        onDecrement: {}
-                    )
-                }
-            }
-            .frame(width: geo.size.width, height: geo.size.height, alignment: .center)
+                .frame(height: 1)
+            
+            TennisPlayerScoreRow(
+                accentColor: team2Color,
+                sportIcon: sportIcon,
+                spinDegrees: team2Spin,
+                sets: tennisState.set2,
+                games: tennisState.game2,
+                pointDisplay: tennisState.pointDisplay(forTeam: 2),
+                isScoringEnabled: isScoringEnabled,
+                onTap: onPointTeam2
+            )
         }
-        .frame(height: 78)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 4)
+        .frame(height: 102)
     }
 }
 
@@ -1735,8 +1676,8 @@ struct ScoreboardView: View {
                             }
                         }
                         .padding(.horizontal, 2)
-                        .padding(.top, isBasketball ? 0 : (isTennis ? 4 : 10))
-                        .offset(y: isBasketball ? -12 : (isTennis ? -4 : 2))
+                        .padding(.top, isBasketball ? 0 : (isTennis ? 0 : 10))
+                        .offset(y: isBasketball ? -12 : (isTennis ? -16 : 2))
                         .overlay(alignment: .bottom) {
                             if !isBasketball {
                                 Text(timeString)
