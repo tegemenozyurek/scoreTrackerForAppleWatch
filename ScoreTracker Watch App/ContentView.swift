@@ -70,22 +70,35 @@ struct SetupActionButtons: View {
     var primaryBackgroundColor: Color = .white
     var primaryForegroundColor: Color = .black
     var isPrimaryPulsing: Bool = false
+    var primaryMatchesSecondaryStyle: Bool = false
     var isInteractionEnabled: Bool = true
+    
+    private var resolvedPrimaryBackground: Color {
+        primaryMatchesSecondaryStyle ? Color.white.opacity(0.15) : primaryBackgroundColor
+    }
+    
+    private var resolvedPrimaryForeground: Color {
+        primaryMatchesSecondaryStyle ? .white : primaryForegroundColor
+    }
+    
+    private var resolvedPrimaryPulsing: Bool {
+        primaryMatchesSecondaryStyle ? false : isPrimaryPulsing
+    }
     
     var body: some View {
         VStack(spacing: 6) {
             Button(action: primaryAction) {
                 Text(primaryTitle)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(primaryForegroundColor)
+                    .font(.system(size: 12, weight: primaryMatchesSecondaryStyle ? .medium : .semibold))
+                    .foregroundColor(resolvedPrimaryForeground)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 5)
-                    .background(primaryBackgroundColor)
+                    .background(resolvedPrimaryBackground)
                     .cornerRadius(6)
-                    .scaleEffect(isPrimaryPulsing ? 1.03 : 0.98)
+                    .scaleEffect(resolvedPrimaryPulsing ? 1.03 : 0.98)
                     .animation(
                         .easeInOut(duration: 1.4).repeatForever(autoreverses: true),
-                        value: isPrimaryPulsing
+                        value: resolvedPrimaryPulsing
                     )
             }
             .buttonStyle(PlainButtonStyle())
@@ -751,7 +764,8 @@ struct FootballSetupView: View {
                                         secondaryAction: { currentStep = 1 },
                                         primaryBackgroundColor: themeColor,
                                         primaryForegroundColor: .white,
-                                        isPrimaryPulsing: isStartPulsing
+                                        isPrimaryPulsing: isStartPulsing,
+                                        primaryMatchesSecondaryStyle: sportName == "Tennis"
                                     )
                                 }
                             }
@@ -796,9 +810,11 @@ struct FootballSetupView: View {
                 if sportName == "Tennis" {
                     hasTimeLimit = false
                     selectedTime = 0
-                }
-                withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
-                    isStartPulsing = true
+                    isStartPulsing = false
+                } else {
+                    withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+                        isStartPulsing = true
+                    }
                 }
             } else {
                 isStartPulsing = false
