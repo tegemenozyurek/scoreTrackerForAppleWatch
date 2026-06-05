@@ -1748,7 +1748,36 @@ struct ScoreboardView: View {
     private var isBasketball: Bool { sportName == "Basketball" }
     private var isTennis: Bool { sportName == "Tennis" }
     private var showsMatchEndScreen: Bool {
-        sportName == "Basketball" || sportName == "Football"
+        isBasketball || sportName == "Football" || isTennis
+    }
+    
+    /// Setler eşitken (ör. 0–0) maç sonu skoru ve kazanan game sayısına göre.
+    private var tennisMatchEndUsesGames: Bool {
+        tennisState.set1 == tennisState.set2
+    }
+    
+    private var tennisMatchWinner: Int? {
+        guard isTennis else { return nil }
+        if tennisState.set1 != tennisState.set2 {
+            return tennisState.set1 > tennisState.set2 ? 1 : 2
+        }
+        if tennisState.game1 > tennisState.game2 { return 1 }
+        if tennisState.game2 > tennisState.game1 { return 2 }
+        return nil
+    }
+    
+    private var matchEndTeam1Score: Int {
+        if isTennis {
+            return tennisMatchEndUsesGames ? tennisState.game1 : tennisState.set1
+        }
+        return team1Score
+    }
+    
+    private var matchEndTeam2Score: Int {
+        if isTennis {
+            return tennisMatchEndUsesGames ? tennisState.game2 : tennisState.set2
+        }
+        return team2Score
     }
     
     @State private var team1Score = 0
@@ -1905,8 +1934,8 @@ struct ScoreboardView: View {
                     MatchEndView(
                         backgroundColor: matchEndBackgroundColor,
                         resultMessage: matchResultMessage,
-                        team1Score: team1Score,
-                        team2Score: team2Score,
+                        team1Score: matchEndTeam1Score,
+                        team2Score: matchEndTeam2Score,
                         onFinish: exitToSportList,
                         onStats: { showingStats = true }
                     )
@@ -1941,9 +1970,11 @@ struct ScoreboardView: View {
     
     private var matchResultMessage: String {
         if isTennis {
-            if tennisState.set1 > tennisState.set2 { return "Team 1 wins" }
-            if tennisState.set2 > tennisState.set1 { return "Team 2 wins" }
-            return "Draw"
+            switch tennisMatchWinner {
+            case 1: return "Player 1 wins"
+            case 2: return "Player 2 wins"
+            default: return "Draw"
+            }
         }
         if team1Score > team2Score { return "Team 1 wins" }
         if team2Score > team1Score { return "Team 2 wins" }
@@ -1952,9 +1983,11 @@ struct ScoreboardView: View {
     
     private var matchEndBackgroundColor: Color {
         if isTennis {
-            if tennisState.set1 > tennisState.set2 { return team1Color }
-            if tennisState.set2 > tennisState.set1 { return team2Color }
-            return .gray
+            switch tennisMatchWinner {
+            case 1: return team1Color
+            case 2: return team2Color
+            default: return .gray
+            }
         }
         if team1Score > team2Score { return team1Color }
         if team2Score > team1Score { return team2Color }
