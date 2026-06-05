@@ -198,7 +198,7 @@ struct ScoreboardView: View {
                     
                     HStack(spacing: 8) {
                         MatchControlButton(
-                            backgroundColor: .yellow,
+                            backgroundColor: Color(hex: "#1C1C1E"),
                             accessibilityLabel: "Revert last score",
                             isEnabled: isTennis ? !tennisHistory.isEmpty : (isVolleyball ? !volleyballHistory.isEmpty : !scoreHistory.isEmpty),
                             action: revertLastScoreChange
@@ -209,7 +209,7 @@ struct ScoreboardView: View {
                         }
                         
                         MatchControlButton(
-                            backgroundColor: .orange,
+                            backgroundColor: Color(hex: "#1C1C1E"),
                             accessibilityLabel: isGameActive ? "Pause match" : "Resume match",
                             isEnabled: true,
                             action: { isGameActive.toggle() }
@@ -220,7 +220,7 @@ struct ScoreboardView: View {
                         }
                         
                         MatchControlButton(
-                            backgroundColor: .red,
+                            backgroundColor: Color(hex: "#1C1C1E"),
                             accessibilityLabel: "Finish match",
                             isEnabled: !showingMatchEnd,
                             action: requestFinishFromWhistle
