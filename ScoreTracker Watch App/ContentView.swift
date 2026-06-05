@@ -34,6 +34,57 @@ private enum SetupScreenMetrics {
     static let headerBlockHeight: CGFloat = 80
 }
 
+private enum MatchScreenMetrics {
+    /// Fixed BPM band height (pre-shrink layout) so scoreboards stay put when visuals scale down.
+    static let bpmBandHeight: CGFloat = 36
+}
+
+private struct MatchBPMHeaderView: View {
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "heart.fill")
+                .foregroundColor(.red)
+                .font(.system(size: 13))
+            
+            Text("--")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white)
+            
+            Text("BPM")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(.white.opacity(0.7))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(Color.white.opacity(0.1))
+        .clipShape(Capsule())
+        .frame(height: MatchScreenMetrics.bpmBandHeight)
+    }
+}
+
+private struct MatchTopHeaderView: View {
+    let timeString: String?
+    
+    var body: some View {
+        ZStack {
+            MatchBPMHeaderView()
+            
+            if let timeString {
+                HStack {
+                    Text(timeString)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.85))
+                        .monospacedDigit()
+                        .padding(.leading, 10)
+                    Spacer(minLength: 0)
+                }
+                .frame(height: MatchScreenMetrics.bpmBandHeight)
+            }
+        }
+        .frame(height: MatchScreenMetrics.bpmBandHeight)
+    }
+}
+
 struct SetupActionButtons: View {
     let primaryTitle: String
     let primaryAction: () -> Void
@@ -42,22 +93,35 @@ struct SetupActionButtons: View {
     var primaryBackgroundColor: Color = .white
     var primaryForegroundColor: Color = .black
     var isPrimaryPulsing: Bool = false
+    var primaryMatchesSecondaryStyle: Bool = false
     var isInteractionEnabled: Bool = true
+    
+    private var resolvedPrimaryBackground: Color {
+        primaryMatchesSecondaryStyle ? Color.white.opacity(0.15) : primaryBackgroundColor
+    }
+    
+    private var resolvedPrimaryForeground: Color {
+        primaryMatchesSecondaryStyle ? .white : primaryForegroundColor
+    }
+    
+    private var resolvedPrimaryPulsing: Bool {
+        primaryMatchesSecondaryStyle ? false : isPrimaryPulsing
+    }
     
     var body: some View {
         VStack(spacing: 6) {
             Button(action: primaryAction) {
                 Text(primaryTitle)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(primaryForegroundColor)
+                    .font(.system(size: 12, weight: primaryMatchesSecondaryStyle ? .medium : .semibold))
+                    .foregroundColor(resolvedPrimaryForeground)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 5)
-                    .background(primaryBackgroundColor)
+                    .background(resolvedPrimaryBackground)
                     .cornerRadius(6)
-                    .scaleEffect(isPrimaryPulsing ? 1.03 : 0.98)
+                    .scaleEffect(resolvedPrimaryPulsing ? 1.03 : 0.98)
                     .animation(
                         .easeInOut(duration: 1.4).repeatForever(autoreverses: true),
-                        value: isPrimaryPulsing
+                        value: resolvedPrimaryPulsing
                     )
             }
             .buttonStyle(PlainButtonStyle())
@@ -131,6 +195,7 @@ struct PickColorWheelHint: View {
 
 struct TeamColorWheelSelectionView: View {
     let teamNumber: Int
+    var usesPlayerLabel: Bool = false
     let sportIcon: String
     @Binding var colorIndex: Int
     let availableColorIndices: [Int]
@@ -174,7 +239,7 @@ struct TeamColorWheelSelectionView: View {
                 
                 VStack(spacing: 0) {
                     VStack(spacing: 8) {
-                        Text("Team #\(teamNumber)")
+                        Text("\(usesPlayerLabel ? "Player" : "Team") #\(teamNumber)")
                             .font(.system(size: 22, weight: .bold))
                             .foregroundColor(.white)
                             .multilineTextAlignment(.center)
@@ -606,8 +671,9 @@ struct FootballSetupView: View {
         self.themeColor = themeColor
         self.sportName = sportName
         self.sportIcon = sportIcon
-        _hasTimeLimit = State(initialValue: defaultHasTimeLimit)
-        _selectedTime = State(initialValue: defaultHasTimeLimit ? 60 : 0)
+        let startsWithoutTimeLimit = sportName == "Tennis" || !defaultHasTimeLimit
+        _hasTimeLimit = State(initialValue: !startsWithoutTimeLimit)
+        _selectedTime = State(initialValue: startsWithoutTimeLimit ? 0 : 60)
     }
     
     private var allColorIndices: [Int] {
@@ -685,6 +751,7 @@ struct FootballSetupView: View {
                         case 0:
                             TeamColorWheelSelectionView(
                                 teamNumber: 1,
+                                usesPlayerLabel: sportName == "Tennis",
                                 sportIcon: sportIcon,
                                 colorIndex: $team1ColorIndex,
                                 availableColorIndices: allColorIndices,
@@ -694,6 +761,7 @@ struct FootballSetupView: View {
                         case 1:
                             TeamColorWheelSelectionView(
                                 teamNumber: 2,
+                                usesPlayerLabel: sportName == "Tennis",
                                 sportIcon: sportIcon,
                                 colorIndex: $team2ColorIndex,
                                 availableColorIndices: team2ColorIndices,
@@ -719,7 +787,8 @@ struct FootballSetupView: View {
                                         secondaryAction: { currentStep = 1 },
                                         primaryBackgroundColor: themeColor,
                                         primaryForegroundColor: .white,
-                                        isPrimaryPulsing: isStartPulsing
+                                        isPrimaryPulsing: isStartPulsing,
+                                        primaryMatchesSecondaryStyle: sportName == "Tennis"
                                     )
                                 }
                             }
@@ -761,8 +830,14 @@ struct FootballSetupView: View {
         }
         .onChange(of: currentStep) { _, step in
             if step == 2 {
-                withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
-                    isStartPulsing = true
+                if sportName == "Tennis" {
+                    hasTimeLimit = false
+                    selectedTime = 0
+                    isStartPulsing = false
+                } else {
+                    withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+                        isStartPulsing = true
+                    }
                 }
             } else {
                 isStartPulsing = false
@@ -815,6 +890,157 @@ private struct MatchControlButton<Icon: View>: View {
 private struct ScoreSnapshot: Equatable {
     let team1: Int
     let team2: Int
+}
+
+private enum TennisServeSide: String, Equatable {
+    case left = "LEFT"
+    case right = "RIGHT"
+}
+
+private struct TennisMatchState: Equatable {
+    var point1: Int = 0
+    var point2: Int = 0
+    var game1: Int = 0
+    var game2: Int = 0
+    var set1: Int = 0
+    var set2: Int = 0
+    var servingPlayer: Int = 1
+    var serveSide: TennisServeSide = .right
+    /// Server for tiebreak point 1 when at 6–6; nil outside tiebreak.
+    var tiebreakFirstServer: Int? = nil
+    
+    private static let pointLabels = ["0", "15", "30", "40"]
+    
+    func pointDisplay(forTeam team: Int) -> String {
+        let points = team == 1 ? point1 : point2
+        let opponent = team == 1 ? point2 : point1
+        if points < 4 { return Self.pointLabels[points] }
+        if opponent >= 3 {
+            if points - opponent == 1 { return "Ad" }
+            return "40"
+        }
+        return "40"
+    }
+    
+    mutating func awardPoint(to team: Int) {
+        guard team == 1 || team == 2 else { return }
+        let serverAtStart = servingPlayer
+        let gamesBefore = (game1, game2)
+        
+        var p1 = point1
+        var p2 = point2
+        var g1 = game1
+        var g2 = game2
+        var s1 = set1
+        var s2 = set2
+        
+        if team == 1 {
+            Self.applyPoint(
+                scorer: &p1,
+                other: &p2,
+                games: &g1,
+                otherGames: &g2,
+                sets: &s1,
+                otherSets: &s2
+            )
+        } else {
+            Self.applyPoint(
+                scorer: &p2,
+                other: &p1,
+                games: &g2,
+                otherGames: &g1,
+                sets: &s2,
+                otherSets: &s1
+            )
+        }
+        
+        point1 = p1
+        point2 = p2
+        game1 = g1
+        game2 = g2
+        set1 = s1
+        set2 = s2
+        
+        let gameWon = game1 != gamesBefore.0 || game2 != gamesBefore.1
+        advanceServe(gameWon: gameWon, serverAtPointStart: serverAtStart)
+    }
+    
+    private mutating func advanceServe(gameWon: Bool, serverAtPointStart: Int) {
+        if gameWon {
+            servingPlayer = serverAtPointStart == 1 ? 2 : 1
+            serveSide = .right
+            if game1 == 6 && game2 == 6 {
+                tiebreakFirstServer = servingPlayer
+            } else {
+                tiebreakFirstServer = nil
+            }
+            return
+        }
+        
+        if game1 == 6 && game2 == 6 {
+            if tiebreakFirstServer == nil {
+                tiebreakFirstServer = servingPlayer
+            }
+            applyTiebreakServeRotation()
+        } else {
+            tiebreakFirstServer = nil
+            serveSide = serveSide == .left ? .right : .left
+        }
+    }
+    
+    /// Tiebreak: first server one point, then alternate every two points; side alternates each point.
+    private mutating func applyTiebreakServeRotation() {
+        guard let first = tiebreakFirstServer else { return }
+        let pointsPlayed = point1 + point2
+        let serveBlock = max(0, (pointsPlayed - 1) / 2)
+        servingPlayer = (serveBlock % 2 == 0) ? first : (3 - first)
+        serveSide = (pointsPlayed % 2 == 1) ? .right : .left
+    }
+    
+    private static func applyPoint(
+        scorer: inout Int,
+        other: inout Int,
+        games: inout Int,
+        otherGames: inout Int,
+        sets: inout Int,
+        otherSets: inout Int
+    ) {
+        var wonGame = false
+        
+        if scorer >= 3 && other >= 3 {
+            if scorer - other >= 1 {
+                wonGame = true
+            } else if scorer == other {
+                scorer += 1
+            } else {
+                scorer = 3
+                other = 3
+            }
+        } else {
+            scorer += 1
+            if scorer >= 4 && scorer - other >= 2 {
+                wonGame = true
+            }
+        }
+        
+        guard wonGame else { return }
+        
+        games += 1
+        scorer = 0
+        other = 0
+        
+        if Self.isSetWon(games: games, otherGames: otherGames) {
+            sets += 1
+            games = 0
+            otherGames = 0
+        }
+    }
+    
+    private static func isSetWon(games: Int, otherGames: Int) -> Bool {
+        if games >= 6 && games - otherGames >= 2 { return true }
+        if games == 7 && otherGames == 5 { return true }
+        return false
+    }
 }
 
 private struct MatchScoreLabel: View {
@@ -1046,6 +1272,7 @@ private struct ScoreboardScoreRow: View {
     let team2Score: Int
     let team1Spin: Double
     let team2Spin: Double
+    var allowsScoreTapIncrement: Bool = true
     let onGoalTeam1: () -> Void
     let onGoalTeam2: () -> Void
     let onDecrementTeam1: () -> Void
@@ -1080,7 +1307,7 @@ private struct ScoreboardScoreRow: View {
                         score: team1Score,
                         columnWidth: scoreColumnWidth,
                         fontSize: scoreFontSize,
-                        onGoal: onGoalTeam1,
+                        onGoal: allowsScoreTapIncrement ? onGoalTeam1 : {},
                         onDecrement: onDecrementTeam1
                     )
                     
@@ -1094,7 +1321,7 @@ private struct ScoreboardScoreRow: View {
                         score: team2Score,
                         columnWidth: scoreColumnWidth,
                         fontSize: scoreFontSize,
-                        onGoal: onGoalTeam2,
+                        onGoal: allowsScoreTapIncrement ? onGoalTeam2 : {},
                         onDecrement: onDecrementTeam2
                     )
                 }
@@ -1123,6 +1350,189 @@ private struct ScoreboardScoreRow: View {
         default: min(24, columnWidth * 0.95)
         }
         return max(18, base)
+    }
+}
+
+private struct TennisStatValueLabel: View {
+    let value: Int
+    let accentColor: Color
+    let columnWidth: CGFloat
+    
+    @State private var scale: CGFloat = 1
+    
+    var body: some View {
+        Text("\(value)")
+            .font(.system(size: 19, weight: .bold))
+            .foregroundColor(accentColor)
+            .monospacedDigit()
+            .scaleEffect(scale)
+            .frame(width: columnWidth)
+            .onChange(of: value) { _, _ in
+                pulseScale()
+            }
+    }
+    
+    private func pulseScale() {
+        withAnimation(.easeOut(duration: 0.2)) {
+            scale = 1.85
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            withAnimation(.easeIn(duration: 0.12)) {
+                scale = 0.82
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.45)) {
+                    scale = 1
+                }
+            }
+        }
+    }
+}
+
+private struct TennisPlayerScoreRow: View {
+    let accentColor: Color
+    let sportIcon: String
+    let spinDegrees: Double
+    let sets: Int
+    let games: Int
+    let pointDisplay: String
+    let isScoringEnabled: Bool
+    let onTap: () -> Void
+    
+    private let iconColumnWidth: CGFloat = 58
+    private let statColumnWidth: CGFloat = 36
+    private let pointFontSize: CGFloat = 30
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            Image(systemName: sportIcon)
+                .font(.system(size: 38, weight: .medium))
+                .foregroundStyle(accentColor)
+                .symbolRenderingMode(.monochrome)
+                .rotationEffect(.degrees(spinDegrees))
+                .animation(.easeInOut(duration: TeamScoreBall.spinDuration), value: spinDegrees)
+                .frame(width: iconColumnWidth)
+            
+            columnDivider
+            
+            TennisStatValueLabel(
+                value: sets,
+                accentColor: accentColor,
+                columnWidth: statColumnWidth
+            )
+            
+            columnDivider
+            
+            TennisStatValueLabel(
+                value: games,
+                accentColor: accentColor,
+                columnWidth: statColumnWidth
+            )
+            
+            columnDivider
+            
+            Text(pointDisplay)
+                .font(.system(size: pointFontSize, weight: .bold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .padding(.vertical, 11)
+        .padding(.horizontal, 10)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard isScoringEnabled else { return }
+            onTap()
+        }
+        .allowsHitTesting(isScoringEnabled)
+    }
+    
+    private var columnDivider: some View {
+        Rectangle()
+            .fill(accentColor.opacity(0.28))
+            .frame(width: 1)
+            .padding(.vertical, 6)
+    }
+}
+
+private struct TennisServeIndicator: View {
+    let servingPlayer: Int
+    let serveSide: TennisServeSide
+    let team1Color: Color
+    let team2Color: Color
+    
+    private var serverColor: Color {
+        servingPlayer == 1 ? team1Color : team2Color
+    }
+    
+    var body: some View {
+        Text(serveSide.rawValue)
+            .font(.system(size: 16, weight: .bold))
+            .foregroundColor(serverColor)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 10)
+    }
+}
+
+private struct TennisScoreboardRow: View {
+    let team1Color: Color
+    let team2Color: Color
+    let sportIcon: String
+    let tennisState: TennisMatchState
+    let team1Spin: Double
+    let team2Spin: Double
+    let isScoringEnabled: Bool
+    let onPointTeam1: () -> Void
+    let onPointTeam2: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 0) {
+                TennisPlayerScoreRow(
+                    accentColor: team1Color,
+                    sportIcon: sportIcon,
+                    spinDegrees: team1Spin,
+                    sets: tennisState.set1,
+                    games: tennisState.game1,
+                    pointDisplay: tennisState.pointDisplay(forTeam: 1),
+                    isScoringEnabled: isScoringEnabled,
+                    onTap: onPointTeam1
+                )
+                
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [team1Color.opacity(0.55), team2Color.opacity(0.55)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(height: 1)
+                
+                TennisPlayerScoreRow(
+                    accentColor: team2Color,
+                    sportIcon: sportIcon,
+                    spinDegrees: team2Spin,
+                    sets: tennisState.set2,
+                    games: tennisState.game2,
+                    pointDisplay: tennisState.pointDisplay(forTeam: 2),
+                    isScoringEnabled: isScoringEnabled,
+                    onTap: onPointTeam2
+                )
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 4)
+            .frame(height: 118)
+            
+            TennisServeIndicator(
+                servingPlayer: tennisState.servingPlayer,
+                serveSide: tennisState.serveSide,
+                team1Color: team1Color,
+                team2Color: team2Color
+            )
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -1336,18 +1746,50 @@ struct ScoreboardView: View {
     @Binding var dismissToMain: Bool
     
     private var isBasketball: Bool { sportName == "Basketball" }
+    private var isTennis: Bool { sportName == "Tennis" }
     private var showsMatchEndScreen: Bool {
-        sportName == "Basketball" || sportName == "Football"
+        isBasketball || sportName == "Football" || isTennis
+    }
+    
+    /// Setler eşitken (ör. 0–0) maç sonu skoru ve kazanan game sayısına göre.
+    private var tennisMatchEndUsesGames: Bool {
+        tennisState.set1 == tennisState.set2
+    }
+    
+    private var tennisMatchWinner: Int? {
+        guard isTennis else { return nil }
+        if tennisState.set1 != tennisState.set2 {
+            return tennisState.set1 > tennisState.set2 ? 1 : 2
+        }
+        if tennisState.game1 > tennisState.game2 { return 1 }
+        if tennisState.game2 > tennisState.game1 { return 2 }
+        return nil
+    }
+    
+    private var matchEndTeam1Score: Int {
+        if isTennis {
+            return tennisMatchEndUsesGames ? tennisState.game1 : tennisState.set1
+        }
+        return team1Score
+    }
+    
+    private var matchEndTeam2Score: Int {
+        if isTennis {
+            return tennisMatchEndUsesGames ? tennisState.game2 : tennisState.set2
+        }
+        return team2Score
     }
     
     @State private var team1Score = 0
     @State private var team2Score = 0
+    @State private var tennisState = TennisMatchState()
     @State private var timerSeconds: Int = 0
     @State private var isGameActive = true
     @State private var showingFinishAlert = false
     @State private var showingMatchEnd = false
     @State private var showingStats = false
     @State private var scoreHistory: [ScoreSnapshot] = []
+    @State private var tennisHistory: [TennisMatchState] = []
     @State private var isScoreIncreaseLocked = false
     @State private var team1Spin: Double = 0
     @State private var team2Spin: Double = 0
@@ -1380,23 +1822,7 @@ struct ScoreboardView: View {
                 ZStack(alignment: .bottom) {
                     VStack(spacing: 0) {
                         VStack(spacing: 4) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "heart.fill")
-                                    .foregroundColor(.red)
-                                    .font(.system(size: 16))
-                                
-                                Text("--")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundColor(.white)
-                                
-                                Text("BPM")
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.7))
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.white.opacity(0.1))
-                            .clipShape(Capsule())
+                            MatchTopHeaderView(timeString: isTennis ? timeString : nil)
                         }
                         .padding(.top, -60)
                         
@@ -1417,6 +1843,18 @@ struct ScoreboardView: View {
                                     onDecrementTeam1: { adjustTeam1Score(by: -1) },
                                     onDecrementTeam2: { adjustTeam2Score(by: -1) }
                                 )
+                            } else if isTennis {
+                                TennisScoreboardRow(
+                                    team1Color: team1Color,
+                                    team2Color: team2Color,
+                                    sportIcon: sportIcon,
+                                    tennisState: tennisState,
+                                    team1Spin: team1Spin,
+                                    team2Spin: team2Spin,
+                                    isScoringEnabled: !isScoreIncreaseLocked,
+                                    onPointTeam1: { awardTennisPoint(to: 1) },
+                                    onPointTeam2: { awardTennisPoint(to: 2) }
+                                )
                             } else {
                                 ScoreboardScoreRow(
                                     team1Color: team1Color,
@@ -1434,10 +1872,10 @@ struct ScoreboardView: View {
                             }
                         }
                         .padding(.horizontal, 2)
-                        .padding(.top, isBasketball ? 0 : 10)
-                        .offset(y: isBasketball ? -12 : 2)
+                        .padding(.top, isBasketball ? 0 : (isTennis ? 0 : 10))
+                        .offset(y: isBasketball ? -12 : (isTennis ? -18 : 2))
                         .overlay(alignment: .bottom) {
-                            if !isBasketball {
+                            if !isBasketball && !isTennis {
                                 Text(timeString)
                                     .font(.system(size: 15, weight: .semibold))
                                     .foregroundColor(.white.opacity(0.85))
@@ -1453,7 +1891,7 @@ struct ScoreboardView: View {
                         MatchControlButton(
                             backgroundColor: .yellow,
                             accessibilityLabel: "Revert last score",
-                            isEnabled: !scoreHistory.isEmpty,
+                            isEnabled: isTennis ? !tennisHistory.isEmpty : !scoreHistory.isEmpty,
                             action: revertLastScoreChange
                         ) {
                             Image(systemName: "arrow.uturn.backward")
@@ -1496,8 +1934,8 @@ struct ScoreboardView: View {
                     MatchEndView(
                         backgroundColor: matchEndBackgroundColor,
                         resultMessage: matchResultMessage,
-                        team1Score: team1Score,
-                        team2Score: team2Score,
+                        team1Score: matchEndTeam1Score,
+                        team2Score: matchEndTeam2Score,
                         onFinish: exitToSportList,
                         onStats: { showingStats = true }
                     )
@@ -1531,12 +1969,26 @@ struct ScoreboardView: View {
     }
     
     private var matchResultMessage: String {
+        if isTennis {
+            switch tennisMatchWinner {
+            case 1: return "Player 1 wins"
+            case 2: return "Player 2 wins"
+            default: return "Draw"
+            }
+        }
         if team1Score > team2Score { return "Team 1 wins" }
         if team2Score > team1Score { return "Team 2 wins" }
         return "Draw"
     }
     
     private var matchEndBackgroundColor: Color {
+        if isTennis {
+            switch tennisMatchWinner {
+            case 1: return team1Color
+            case 2: return team2Color
+            default: return .gray
+            }
+        }
         if team1Score > team2Score { return team1Color }
         if team2Score > team1Score { return team2Color }
         return .gray
@@ -1566,6 +2018,31 @@ struct ScoreboardView: View {
     
     private func pushScoreHistory() {
         scoreHistory.append(ScoreSnapshot(team1: team1Score, team2: team2Score))
+    }
+    
+    private func pushTennisHistory() {
+        tennisHistory.append(tennisState)
+    }
+    
+    private func awardTennisPoint(to team: Int) {
+        guard !isScoreIncreaseLocked else { return }
+        isScoreIncreaseLocked = true
+        pushTennisHistory()
+        tennisState.awardPoint(to: team)
+        
+        if team == 1 {
+            withAnimation(.easeInOut(duration: TeamScoreBall.spinDuration)) {
+                team1Spin += 360
+            }
+        } else {
+            withAnimation(.easeInOut(duration: TeamScoreBall.spinDuration)) {
+                team2Spin += 360
+            }
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + TeamScoreBall.spinDuration) {
+            isScoreIncreaseLocked = false
+        }
     }
     
     private func scorePoints(for team: Int, points: Int) {
@@ -1612,6 +2089,11 @@ struct ScoreboardView: View {
     }
     
     private func revertLastScoreChange() {
+        if isTennis {
+            guard let previous = tennisHistory.popLast() else { return }
+            tennisState = previous
+            return
+        }
         guard let previous = scoreHistory.popLast() else { return }
         team1Score = previous.team1
         team2Score = previous.team2
@@ -1712,6 +2194,20 @@ struct SportCard: View {
     }
 }
 
+struct HistoryCard: View {
+    var body: some View {
+        ZStack {
+            Color.black
+                .ignoresSafeArea()
+            
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 80, weight: .medium))
+                .foregroundColor(.white)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
 struct Sport {
     let name: String
     let icon: String
@@ -1756,6 +2252,15 @@ struct ContentView: View {
                                 value: isTransitioning
                             )
                         }
+                        
+                        HistoryCard()
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .scaleEffect(isTransitioning ? 0.85 : 1.0)
+                            .opacity(isTransitioning ? 0.6 : 1.0)
+                            .animation(
+                                Animation.spring(response: 0.5, dampingFraction: 0.7, blendDuration: 0.4),
+                                value: isTransitioning
+                            )
                     }
                 }
                 .scrollTargetBehavior(.paging)
@@ -1780,7 +2285,7 @@ struct ContentView: View {
                     themeColor: setupThemeColor,
                     sportName: setupSportName,
                     sportIcon: setupSportIcon,
-                    defaultHasTimeLimit: setupSportName != "Basketball"
+                    defaultHasTimeLimit: !["Basketball", "Tennis"].contains(setupSportName)
                 )
                 .opacity(setupCoverOpacity)
             }
