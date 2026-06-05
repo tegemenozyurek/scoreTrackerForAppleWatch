@@ -2194,6 +2194,20 @@ struct SportCard: View {
     }
 }
 
+struct HistoryCard: View {
+    var body: some View {
+        ZStack {
+            Color.black
+                .ignoresSafeArea()
+            
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 80, weight: .medium))
+                .foregroundColor(.white)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
 struct Sport {
     let name: String
     let icon: String
@@ -2238,6 +2252,15 @@ struct ContentView: View {
                                 value: isTransitioning
                             )
                         }
+                        
+                        HistoryCard()
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .scaleEffect(isTransitioning ? 0.85 : 1.0)
+                            .opacity(isTransitioning ? 0.6 : 1.0)
+                            .animation(
+                                Animation.spring(response: 0.5, dampingFraction: 0.7, blendDuration: 0.4),
+                                value: isTransitioning
+                            )
                     }
                 }
                 .scrollTargetBehavior(.paging)
