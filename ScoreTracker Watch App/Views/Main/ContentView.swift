@@ -78,7 +78,7 @@ struct ContentView: View {
                     themeColor: setupThemeColor,
                     sportName: setupSportName,
                     sportIcon: setupSportIcon,
-                    defaultHasTimeLimit: !["Basketball", "Tennis"].contains(setupSportName)
+                    defaultHasTimeLimit: !["Basketball", "Tennis", "Volleyball"].contains(setupSportName)
                 )
                 .opacity(setupCoverOpacity)
             }

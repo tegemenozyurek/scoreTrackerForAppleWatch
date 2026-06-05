@@ -21,6 +21,7 @@ struct FootballSetupView: View {
     let themeColor: Color
     let sportName: String
     let sportIcon: String
+    let defaultHasTimeLimit: Bool
     
     init(
         onDismissToSportList: (() -> Void)? = nil,
@@ -33,9 +34,9 @@ struct FootballSetupView: View {
         self.themeColor = themeColor
         self.sportName = sportName
         self.sportIcon = sportIcon
-        let startsWithoutTimeLimit = sportName == "Tennis" || !defaultHasTimeLimit
-        _hasTimeLimit = State(initialValue: !startsWithoutTimeLimit)
-        _selectedTime = State(initialValue: startsWithoutTimeLimit ? 0 : 60)
+        self.defaultHasTimeLimit = defaultHasTimeLimit
+        _hasTimeLimit = State(initialValue: defaultHasTimeLimit)
+        _selectedTime = State(initialValue: defaultHasTimeLimit ? 60 : 0)
     }
     
     private var allColorIndices: [Int] {
@@ -150,7 +151,7 @@ struct FootballSetupView: View {
                                         primaryBackgroundColor: themeColor,
                                         primaryForegroundColor: .white,
                                         isPrimaryPulsing: isStartPulsing,
-                                        primaryMatchesSecondaryStyle: sportName == "Tennis"
+                                        primaryMatchesSecondaryStyle: !defaultHasTimeLimit
                                     )
                                 }
                             }
@@ -192,7 +193,7 @@ struct FootballSetupView: View {
         }
         .onChange(of: currentStep) { _, step in
             if step == 2 {
-                if sportName == "Tennis" {
+                if !defaultHasTimeLimit {
                     hasTimeLimit = false
                     selectedTime = 0
                     isStartPulsing = false
