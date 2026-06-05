@@ -19,8 +19,10 @@ struct ScoreboardView: View {
     
     private var isBasketball: Bool { sportName == "Basketball" }
     private var isTennis: Bool { sportName == "Tennis" }
+    private var isVolleyball: Bool { sportName == "Volleyball" }
+    private var usesSetBasedScoreboard: Bool { isTennis || isVolleyball }
     private var showsMatchEndScreen: Bool {
-        isBasketball || sportName == "Football" || isTennis
+        isBasketball || sportName == "Football" || isTennis || isVolleyball
     }
     
     /// Setler eşitken (ör. 0–0) maç sonu skoru ve kazanan game sayısına göre.
@@ -38,9 +40,27 @@ struct ScoreboardView: View {
         return nil
     }
     
+    /// Setler eşitken (ör. 0–0) maç sonu skoru ve kazanan sayılara göre.
+    private var volleyballMatchEndUsesPoints: Bool {
+        volleyballState.set1 == volleyballState.set2
+    }
+    
+    private var volleyballMatchWinner: Int? {
+        guard isVolleyball else { return nil }
+        if volleyballState.set1 != volleyballState.set2 {
+            return volleyballState.set1 > volleyballState.set2 ? 1 : 2
+        }
+        if volleyballState.point1 > volleyballState.point2 { return 1 }
+        if volleyballState.point2 > volleyballState.point1 { return 2 }
+        return nil
+    }
+    
     private var matchEndTeam1Score: Int {
         if isTennis {
             return tennisMatchEndUsesGames ? tennisState.game1 : tennisState.set1
+        }
+        if isVolleyball {
+            return volleyballMatchEndUsesPoints ? volleyballState.point1 : volleyballState.set1
         }
         return team1Score
     }
@@ -49,12 +69,16 @@ struct ScoreboardView: View {
         if isTennis {
             return tennisMatchEndUsesGames ? tennisState.game2 : tennisState.set2
         }
+        if isVolleyball {
+            return volleyballMatchEndUsesPoints ? volleyballState.point2 : volleyballState.set2
+        }
         return team2Score
     }
     
     @State private var team1Score = 0
     @State private var team2Score = 0
     @State private var tennisState = TennisMatchState()
+    @State private var volleyballState = VolleyballMatchState()
     @State private var timerSeconds: Int = 0
     @State private var isGameActive = true
     @State private var showingFinishAlert = false
@@ -62,6 +86,7 @@ struct ScoreboardView: View {
     @State private var showingStats = false
     @State private var scoreHistory: [ScoreSnapshot] = []
     @State private var tennisHistory: [TennisMatchState] = []
+    @State private var volleyballHistory: [VolleyballMatchState] = []
     @State private var isScoreIncreaseLocked = false
     @State private var team1Spin: Double = 0
     @State private var team2Spin: Double = 0
@@ -94,7 +119,7 @@ struct ScoreboardView: View {
                 ZStack(alignment: .bottom) {
                     VStack(spacing: 0) {
                         VStack(spacing: 4) {
-                            MatchTopHeaderView(timeString: isTennis ? timeString : nil)
+                            MatchTopHeaderView(timeString: usesSetBasedScoreboard ? timeString : nil)
                         }
                         .padding(.top, -60)
                         
@@ -127,6 +152,18 @@ struct ScoreboardView: View {
                                     onPointTeam1: { awardTennisPoint(to: 1) },
                                     onPointTeam2: { awardTennisPoint(to: 2) }
                                 )
+                            } else if isVolleyball {
+                                VolleyballScoreboardRow(
+                                    team1Color: team1Color,
+                                    team2Color: team2Color,
+                                    sportIcon: sportIcon,
+                                    volleyballState: volleyballState,
+                                    team1Spin: team1Spin,
+                                    team2Spin: team2Spin,
+                                    isScoringEnabled: !isScoreIncreaseLocked && volleyballState.matchWinner == nil,
+                                    onPointTeam1: { awardVolleyballPoint(to: 1) },
+                                    onPointTeam2: { awardVolleyballPoint(to: 2) }
+                                )
                             } else {
                                 ScoreboardScoreRow(
                                     team1Color: team1Color,
@@ -144,10 +181,10 @@ struct ScoreboardView: View {
                             }
                         }
                         .padding(.horizontal, 2)
-                        .padding(.top, isBasketball ? 0 : (isTennis ? 0 : 10))
-                        .offset(y: isBasketball ? -12 : (isTennis ? -18 : 2))
+                        .padding(.top, isBasketball ? 0 : (usesSetBasedScoreboard ? 0 : 10))
+                        .offset(y: isBasketball ? -12 : (usesSetBasedScoreboard ? -18 : 2))
                         .overlay(alignment: .bottom) {
-                            if !isBasketball && !isTennis {
+                            if !isBasketball && !usesSetBasedScoreboard {
                                 Text(timeString)
                                     .font(.system(size: 15, weight: .semibold))
                                     .foregroundColor(.white.opacity(0.85))
@@ -163,7 +200,7 @@ struct ScoreboardView: View {
                         MatchControlButton(
                             backgroundColor: .yellow,
                             accessibilityLabel: "Revert last score",
-                            isEnabled: isTennis ? !tennisHistory.isEmpty : !scoreHistory.isEmpty,
+                            isEnabled: isTennis ? !tennisHistory.isEmpty : (isVolleyball ? !volleyballHistory.isEmpty : !scoreHistory.isEmpty),
                             action: revertLastScoreChange
                         ) {
                             Image(systemName: "arrow.uturn.backward")
@@ -248,6 +285,13 @@ struct ScoreboardView: View {
             default: return "Draw"
             }
         }
+        if isVolleyball {
+            switch volleyballMatchWinner {
+            case 1: return "Team 1 wins"
+            case 2: return "Team 2 wins"
+            default: return "Draw"
+            }
+        }
         if team1Score > team2Score { return "Team 1 wins" }
         if team2Score > team1Score { return "Team 2 wins" }
         return "Draw"
@@ -256,6 +300,13 @@ struct ScoreboardView: View {
     private var matchEndBackgroundColor: Color {
         if isTennis {
             switch tennisMatchWinner {
+            case 1: return team1Color
+            case 2: return team2Color
+            default: return .gray
+            }
+        }
+        if isVolleyball {
+            switch volleyballMatchWinner {
             case 1: return team1Color
             case 2: return team2Color
             default: return .gray
@@ -296,6 +347,10 @@ struct ScoreboardView: View {
         tennisHistory.append(tennisState)
     }
     
+    func pushVolleyballHistory() {
+        volleyballHistory.append(volleyballState)
+    }
+    
     func awardTennisPoint(to team: Int) {
         guard !isScoreIncreaseLocked else { return }
         isScoreIncreaseLocked = true
@@ -314,6 +369,32 @@ struct ScoreboardView: View {
         
         DispatchQueue.main.asyncAfter(deadline: .now() + TeamScoreBall.spinDuration) {
             isScoreIncreaseLocked = false
+        }
+    }
+    
+    func awardVolleyballPoint(to team: Int) {
+        guard !isScoreIncreaseLocked else { return }
+        guard volleyballState.matchWinner == nil else { return }
+        isScoreIncreaseLocked = true
+        pushVolleyballHistory()
+        volleyballState.awardPoint(to: team)
+        
+        if team == 1 {
+            withAnimation(.easeInOut(duration: TeamScoreBall.spinDuration)) {
+                team1Spin += 360
+            }
+        } else {
+            withAnimation(.easeInOut(duration: TeamScoreBall.spinDuration)) {
+                team2Spin += 360
+            }
+        }
+        
+        let matchCompleted = volleyballState.matchWinner != nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + TeamScoreBall.spinDuration) {
+            isScoreIncreaseLocked = false
+            if matchCompleted {
+                presentMatchEnd()
+            }
         }
     }
     
@@ -364,6 +445,11 @@ struct ScoreboardView: View {
         if isTennis {
             guard let previous = tennisHistory.popLast() else { return }
             tennisState = previous
+            return
+        }
+        if isVolleyball {
+            guard let previous = volleyballHistory.popLast() else { return }
+            volleyballState = previous
             return
         }
         guard let previous = scoreHistory.popLast() else { return }
